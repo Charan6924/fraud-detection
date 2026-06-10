@@ -12,15 +12,19 @@ End-to-end ML system that classifies transactions as fraudulent or legitimate in
 
 ## Stack
 
-| Layer | Tool |
-|---|---|
-| Model | XGBoost, scikit-learn |
-| Serving | Lambda (custom Docker container) |
-| API | API Gateway + TypeScript Lambda |
-| Features | Upstash Redis (online), S3 + Parquet (offline) |
-| CI/CD | GitHub Actions |
-| IaC | AWS SST v3 / CDK |
-| Monitoring | Evidently AI, CloudWatch |
+| Layer | Technology | Purpose |
+|---|---|---|
+| Model training | Python, XGBoost, scikit-learn, imbalanced-learn | Imbalanced classification with SMOTE + class weights |
+| Experiment tracking | MLflow | Parameter/metric logging, model registry, promotion gates |
+| Inference container | Python, FastAPI, Docker, Lambda RIC | Self-built model serving container |
+| Serving runtime | TypeScript, Node.js 20, AWS SDK | API handlers, feature merge, orchestrator calls |
+| API layer | AWS API Gateway + Lambda | Request routing, auth, rate limiting |
+| Event ingestion | AWS EventBridge, SQS | Async transaction ingestion, decoupled processing |
+| Feature store | Upstash Redis (online), S3 + Parquet (offline) | Sub-ms feature lookup at inference, batch for training |
+| Database | DynamoDB | Prediction log with TTL-based retention |
+| IaC | AWS SST v3 / CDK | Infrastructure as code, live Lambda dev |
+| CI/CD | GitHub Actions | Training pipeline, container build, canary deploy |
+| Monitoring | Evidently AI, AWS CloudWatch | Drift detection, latency alarms, retraining triggers |
 
 ## Local Dev
 
