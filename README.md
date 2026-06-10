@@ -1,4 +1,4 @@
-# 🏦 Credit Card Fraud Detection
+# Credit Card Fraud Detection
 
 End-to-end ML system that classifies transactions as fraudulent or legitimate in real time. Python handles training and model artifacts; TypeScript handles inference serving and infrastructure.
 
