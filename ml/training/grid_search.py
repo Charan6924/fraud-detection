@@ -34,7 +34,12 @@ def fine_tune():
     print("Building pipeline")
     pipeline = ImbPipeline([
         ("smote", SMOTE(random_state=42)),
-        ("model", xgboost.XGBClassifier(eval_metric="logloss", random_state=42)),
+        ("model", xgboost.XGBClassifier(
+            eval_metric="logloss",
+            random_state=42,
+            tree_method="hist",
+            device="cuda",
+        )),
     ])
 
     print("Setting up grid search")
