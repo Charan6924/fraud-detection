@@ -1,0 +1,14 @@
+[project]
+name = "fraud-detection"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "scikit-learn>=1.5",
+    "xgboost>=2.1",
+    "imbalanced-learn>=0.12",
+    "pyarrow>=17",
+]
