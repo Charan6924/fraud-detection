@@ -16,6 +16,7 @@ models/
 
 # Environment
 .env
+logs/
 
 # macOS
 .DS_Store

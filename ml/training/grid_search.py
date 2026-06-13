@@ -1,13 +1,23 @@
 import joblib
+import os
 from sklearn.metrics import average_precision_score, confusion_matrix, f1_score
-import sklearn
 from sklearn.model_selection import GridSearchCV, StratifiedKFold, train_test_split
 import pandas as pd
 import xgboost
 from imblearn.over_sampling import SMOTE
 from imblearn.pipeline import Pipeline as ImbPipeline
 from sklearn.metrics import make_scorer
+from sklearn.impute import SimpleImputer
 import time
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+
+
+def _pr_auc(y_true, y_prob):
+    return average_precision_score(y_true, y_prob)
+
+
+pr_auc_scorer = make_scorer(_pr_auc, response_method="predict_proba")
 
 param_grid = {
     "model__n_estimators": [100, 200],
@@ -19,7 +29,7 @@ param_grid = {
 
 def fine_tune():
     print("Loading data")
-    df = pd.read_parquet('/Users/charan/Documents/fraud-detection/data/features.parquet')
+    df = pd.read_parquet(os.path.join(PROJECT_ROOT, "data/features.parquet"))
     print(f"  Loaded {len(df)} rows, {len(df.columns)} cols")
 
     print("Splitting features and target")
@@ -28,11 +38,12 @@ def fine_tune():
     print(f"  X shape: {X.shape}, y fraud rate: {y.mean():.4%}")
 
     print("[Train/test split")
-    X_train, y_train, X_test, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
     print(f"  Train: {len(X_train)}, Test: {len(X_test)}")
 
     print("Building pipeline")
     pipeline = ImbPipeline([
+        ("imputer", SimpleImputer(strategy="median")),
         ("smote", SMOTE(random_state=42)),
         ("model", xgboost.XGBClassifier(
             eval_metric="logloss",
@@ -44,12 +55,12 @@ def fine_tune():
 
     print("Setting up grid search")
     cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
-    scorer = make_scorer(average_precision_score)
+    scorer = pr_auc_scorer
 
     total_fits = 72 * 3
     print(f"  {total_fits} total fits (72 params × 3 folds)")
     t1 = time.time()
-    search = GridSearchCV(pipeline, param_grid=param_grid, scoring=scorer, cv=cv, n_jobs=-1, verbose=10)
+    search = GridSearchCV(pipeline, param_grid=param_grid, scoring=scorer, cv=cv, n_jobs=4, verbose=10)
 
     print("Fitting grid search")
     search.fit(X_train, y_train)
@@ -71,7 +82,9 @@ def fine_tune():
     print(f"  FNR:        {fn / (fn + tp):.4%}")
 
     print("Saving model")
-    joblib.dump(search.best_estimator_, "models/finetuned_model.joblib")
+    model_dir = os.path.join(PROJECT_ROOT, "models")
+    os.makedirs(model_dir, exist_ok=True)
+    joblib.dump(search.best_estimator_, os.path.join(model_dir, "finetuned_model.joblib"))
     print("Done!")
 
 

@@ -77,6 +77,10 @@ def build_dataset():
         if col in merged.columns:
             merged[col] = merged[col].fillna(-1)
 
+    # Encode all remaining string columns to numeric
+    for col in merged.select_dtypes(include="object").columns:
+        merged[col] = pd.factorize(merged[col])[0]
+
     feature_cols = [c for c in merged.columns if c != "isFraud"]
     numeric_cols = merged[feature_cols].select_dtypes(include="number").columns.tolist()
     scaler = StandardScaler()
