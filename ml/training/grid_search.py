@@ -16,15 +16,15 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 def _pr_auc(y_true, y_prob):
     return average_precision_score(y_true, y_prob)
 
-
 pr_auc_scorer = make_scorer(_pr_auc, response_method="predict_proba")
 
 param_grid = {
-    "model__n_estimators": [100, 200],
-    "model__max_depth": [3, 5, 7],
-    "model__learning_rate": [0.01, 0.05, 0.1],
+    "model__n_estimators": [200, 500],
+    "model__max_depth": [7, 9, 12],
+    "model__learning_rate": [0.05, 0.1, 0.2],
     "model__subsample": [0.8, 1.0],
     "model__colsample_bytree": [0.8, 1.0],
+    "model__min_child_weight": [1, 5],
 }
 
 def fine_tune():
@@ -57,8 +57,8 @@ def fine_tune():
     cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
     scorer = pr_auc_scorer
 
-    total_fits = 72 * 3
-    print(f"  {total_fits} total fits (72 params × 3 folds)")
+    total_fits = 144 * 3
+    print(f"  {total_fits} total fits (144 params × 3 folds)")
     t1 = time.time()
     search = GridSearchCV(pipeline, param_grid=param_grid, scoring=scorer, cv=cv, n_jobs=4, verbose=10)
 

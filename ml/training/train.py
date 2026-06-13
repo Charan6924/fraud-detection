@@ -1,14 +1,15 @@
+import joblib
+import os
 from sklearn.metrics import average_precision_score, confusion_matrix, f1_score
-from sklearn.pipeline import Pipeline
 import xgboost
 import pandas as pd
 from imblearn.over_sampling import SMOTE
-from imblearn.pipeline import Pipeline as ImbPipeline
 from sklearn.model_selection import train_test_split
-import joblib
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 
 def train_model():
-    df = pd.read_parquet('/Users/charan/Documents/fraud-detection/data/features.parquet')
+    df = pd.read_parquet(os.path.join(PROJECT_ROOT, "data/features.parquet"))
 
     
     X = df.drop(columns=["isFraud"]).values
@@ -38,7 +39,7 @@ def train_model():
     print(f"TP: {tp}  FP: {fp}  FN: {fn}  TN: {tn}")
     print(f"fnr: {fn / (fn + tp):.4%}")
 
-    joblib.dump(model, "models/model.joblib")
+    joblib.dump(model, os.path.join(PROJECT_ROOT, "models/model.joblib"))
 
 if __name__ == "__main__":
     train_model()

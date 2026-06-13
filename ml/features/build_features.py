@@ -1,6 +1,9 @@
+import os
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 
 
 DROP_V = [f"V{i}" for i in range(138, 167)] + [f"V{i}" for i in range(322, 340)]
@@ -59,9 +62,8 @@ ALL_KEEP_NAN = set(
 ALL_IMPUTE_NEG1 = IMPUTE_NEG1
 
 def build_dataset():
-    txn = pd.read_csv('/Users/charan/Documents/fraud-detection/data/dataset/train_transaction.csv')
-    id = pd.read_csv('/Users/charan/Documents/fraud-detection/data/dataset/train_identity.csv')
-
+    txn = pd.read_csv(os.path.join(PROJECT_ROOT, "data/train_transaction.csv"))
+    id = pd.read_csv(os.path.join(PROJECT_ROOT, "data/train_identity.csv"))
     merged = pd.merge(txn,id,how='left',on='TransactionID')
 
     merged["has_identity"] = merged["id_01"].notna().astype(int)
@@ -81,12 +83,20 @@ def build_dataset():
     for col in merged.select_dtypes(include="object").columns:
         merged[col] = pd.factorize(merged[col])[0]
 
+    # Drop zero-importance features
+    imp_path = os.path.join(PROJECT_ROOT, "data/feature_importances.csv")
+    if os.path.exists(imp_path):
+        imp = pd.read_csv(imp_path)
+        zero_imp = imp[imp["importance"] == 0]["feature"].tolist()
+        zero_imp = [c for c in zero_imp if c in merged.columns]
+        merged = merged.drop(columns=zero_imp)
+        print(f"  Dropped {len(zero_imp)} zero-importance features")
     feature_cols = [c for c in merged.columns if c != "isFraud"]
     numeric_cols = merged[feature_cols].select_dtypes(include="number").columns.tolist()
     scaler = StandardScaler()
     merged[numeric_cols] = scaler.fit_transform(merged[numeric_cols])
 
-    merged.to_parquet("data/features.parquet", index=False)
+    merged.to_parquet(os.path.join(PROJECT_ROOT, "data/features.parquet"), index=False)
 
 
 
