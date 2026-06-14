@@ -241,6 +241,53 @@ By completing this project you will have hands-on experience with:
 
 ---
 
+---
+
+## Collaboration Rules (Deployment Phase)
+
+**This is a learning project.** I (Claude) guide — you write the code.
+
+- I'll explain *what* to build, *why* it works, and *how* the pieces fit together
+- You write the actual code, make the files, run the commands
+- I'll review, answer questions, and point out issues
+- If something is ambiguous, I'll explain the options and trade-offs — you decide
+- I will not write code or create files without your explicit instruction
+
+---
+
+## Current Phase: Deployment
+
+### What's Complete
+- Feature engineering pipeline (`ml/features/build_features.py`)
+- Model training + grid search + threshold tuning
+- Final trained model: XGBoost + Random Forest ensemble with meta-model
+
+### Architecture Decisions
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| **Inference model** | Full ensemble (XGBoost + RF + meta-model) | Higher accuracy; container can handle the weight |
+| **API framework** | Next.js 15 app router (API routes) | Serverless-native, deploys via SST/OpenNext on Lambda |
+| **Infrastructure** | SST v3 (AWS CDK) | Stays fully on AWS, teaches IaC, free tier viable |
+| **Model hosting** | Custom Docker container on Lambda | Full control over Python ML stack, no managed service lock-in |
+| **Preprocessing** | Python in the container | Avoids training-serving skew; no fragile TypeScript reimplementation |
+| **Database** | DynamoDB (pay-per-request) | Serverless, free tier covers this project |
+| **Feature store** | Upstash Redis (free tier) | Online features for real-time inference |
+
+### Implementation Roadmap
+
+Ordered for incremental, testable progress:
+
+1. **Inference artifact script** (`ml/deployment/`) — Extract deployable pieces from trained pipeline
+2. **Container** (`container/`) — Dockerfile, FastAPI server, preprocessing, model loading
+3. **Next.js API** (`packages/api/`) — `POST /api/predict`, `GET /api/health`, `GET /api/transactions`
+4. **Shared types** (`packages/core/`) — TypeScript request/response types
+5. **Infrastructure** (`infra/` + `sst.config.ts`) — ECR, DynamoDB, Next.js deployment
+6. **Local dev** (`docker-compose.yml`) — Model container, DynamoDB Local, Redis
+7. **CI/CD** (`.github/workflows/`) — CI checks + deploy pipeline
+
+---
+
 ## Extensions
 
 | Extension | What you learn |
