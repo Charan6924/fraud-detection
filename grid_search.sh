@@ -22,6 +22,6 @@ echo "GPU: $CUDA_VISIBLE_DEVICES"
 echo "Start time: $(date)"
 
 # Run training
-python feature_select.py
+python grid_search.py
 
 echo "End time: $(date)"
