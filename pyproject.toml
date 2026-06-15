@@ -11,4 +11,8 @@ dependencies = [
     "xgboost>=2.1",
     "imbalanced-learn>=0.12",
     "pyarrow>=17",
+    "pydantic>=2.13.4",
+    "preprocess>=2.0.0",
+    "fastapi>=0.137.0",
+    "mangum>=0.21.0",
 ]

@@ -2,6 +2,8 @@ import os
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
+from sklearn.impute import SimpleImputer
+import joblib
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 
@@ -97,7 +99,11 @@ def build_dataset():
     merged[numeric_cols] = scaler.fit_transform(merged[numeric_cols])
 
     merged.to_parquet(os.path.join(PROJECT_ROOT, "data/features.parquet"), index=False)
+    joblib.dump(scaler, os.path.join(PROJECT_ROOT, "container/model/scaler.joblib"))
 
+    imputer = SimpleImputer(strategy="median")
+    imputer.fit(merged[numeric_cols])
+    joblib.dump(imputer, os.path.join(PROJECT_ROOT, "container/model/imputer.joblib"))
 
 
 
