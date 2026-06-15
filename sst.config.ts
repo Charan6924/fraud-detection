@@ -16,26 +16,33 @@ export default $config({
     });
 
     // Container Lambda for model inference
-    const modelFn = new sst.aws.Function("ModelContainer", {
-      container: { file: "container/Dockerfile" },
-      memory: "2048 MB",
-      timeout: "30 seconds",
-      url: true,
+    const vpc = new sst.aws.Vpc("ModelVpc");
+    const cluster = new sst.aws.Cluster("ModelCluster", { vpc });
+
+    const modelService = new sst.aws.Service("ModelService", {
+      cluster,
+      image: { dockerfile: "container/Dockerfile" },
+      memory: "8 GB",
+      cpu: "4 vCPU",
+      loadBalancer: {
+        rules: [{ listen: "80/http" }],
+      },
     });
 
     // Next.js API
     const api = new sst.aws.Nextjs("Api", {
-      path: "packages/api",
-      link: [predictionsTable, modelFn],
-      environment: {
-        CONTAINER_LAMBDA_ARN: modelFn.arn,
-        PREDICTIONS_TABLE: predictionsTable.name,
+    path: "packages/api",
+    link: [predictionsTable, modelService],
+    environment: {
+      MODEL_SERVICE_URL: modelService.url,
+      PREDICTIONS_TABLE: predictionsTable.name,
       },
     });
 
     return {
       api: api.url,
-      model: modelFn.url,
+      model: modelService.url,
     };
-  },
+  }
 });
+    

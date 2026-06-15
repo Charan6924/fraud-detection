@@ -9,7 +9,7 @@ package-lock.json
 .next/
 *.py[cod]
 *.egg-info/
-
+.sst/
 # Virtual environment
 .venv/
 
