@@ -1,5 +1,12 @@
 # Byte-compiled
 __pycache__/
+
+# Node
+node_modules/
+package-lock.json
+
+# Next.js build output
+.next/
 *.py[cod]
 *.egg-info/
 

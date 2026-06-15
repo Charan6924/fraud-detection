@@ -1,0 +1,16 @@
+{
+  "name": "fraud-detection",
+  "type": "module",
+  "scripts": {
+    "dev": "sst dev",
+    "build": "sst build",
+    "deploy": "sst deploy",
+    "console": "sst console"
+  },
+  "devDependencies": {
+    "sst": "^3.13.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ]
+}
