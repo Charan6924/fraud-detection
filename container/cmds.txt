@@ -1,0 +1,11 @@
+# Build & Run
+docker build -t fraud-model:latest .
+docker run -d -p 9000:8080 --name fraud-test fraud-model:latest
+
+# /health
+curl -s -X POST "http://localhost:9000/2015-03-31/functions/function/invocations" \
+  -d '{"resource":"/health","path":"/health","httpMethod":"GET","headers":{},"multiValueHeaders":{},"queryStringParameters":null,"multiValueQueryStringParameters":null,"pathParameters":null,"stageVariables":null,"requestContext":{"resourceId":"health","resourcePath":"/health","httpMethod":"GET","extendedRequestId":"test","requestTime":"01/Jan/2025:00:00:00 +0000","path":"/health","accountId":"123456789012","protocol":"HTTP/1.1","stage":"test","domainPrefix":"test","requestTimeEpoch":0,"requestId":"test","identity":{},"domainName":"test","apiId":"test"},"body":null,"isBase64Encoded":false}'
+
+# /predict
+curl -s -X POST "http://localhost:9000/2015-03-31/functions/function/invocations" \
+  -d '{"resource":"/predict","path":"/predict","httpMethod":"POST","headers":{"Content-Type":"application/json"},"multiValueHeaders":{"Content-Type":["application/json"]},"queryStringParameters":null,"multiValueQueryStringParameters":null,"pathParameters":null,"stageVariables":null,"requestContext":{"resourceId":"predict","resourcePath":"/predict","httpMethod":"POST","extendedRequestId":"test","requestTime":"01/Jan/2025:00:00:00 +0000","path":"/predict","accountId":"123456789012","protocol":"HTTP/1.1","stage":"test","domainPrefix":"test","requestTimeEpoch":0,"requestId":"test","identity":{},"domainName":"test","apiId":"test"},"body":"{\"TransactionAmt\":100.0}","isBase64Encoded":false}'

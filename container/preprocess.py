@@ -6,6 +6,7 @@ import os
 from features import FEATURE_COLUMNS
 
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "model")
+SCALER = joblib.load(os.path.join(MODEL_DIR, "scaler.joblib"))
 
 # Columns filled with -1 in training (same as build_features.py)
 _IMPUTE_NEG1 = (
@@ -33,5 +34,4 @@ def preprocess(transaction: TransactionInput) -> np.ndarray:
     df[_IMPUTE_NEG1] = df[_IMPUTE_NEG1].fillna(-1)
 
     # Other NaN stays as-is: XGBoost handles it, imputer handles it for RF/LR
-    scaler = joblib.load(os.path.join(MODEL_DIR, "scaler.joblib"))
-    return scaler.transform(df)
+    return SCALER.transform(df)

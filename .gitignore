@@ -15,8 +15,10 @@ data/*.parquet
 models/
 container/model/
 
+
 # Environment
 .env
+
 logs/
 
 # macOS
