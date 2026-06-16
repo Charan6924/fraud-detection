@@ -33,11 +33,32 @@ sst dev              # live-reload Lambda handlers
 docker compose up    # Redis + model container + DynamoDB Local
 ```
 
+## Planned: EventBridge Ingestion
+
+The goal is to decouple transaction ingestion from prediction via an event-driven pipeline:
+
+```
+Payment Processor / Replay Script
+        │
+        ▼
+  EventBridge Bus ──→ Ingest Lambda ──→ SQS ──→ Predict Lambda ──→ DynamoDB
+                              │
+                              ▼
+                          Redis (online features)
+```
+
+1. A **replay script** publishes each transaction from the Kaggle dataset as an event to EventBridge
+2. **Ingest Lambda** picks up the event, computes online features (rolling aggregates per card), writes them to Redis, and forwards the enriched event to SQS
+3. **Predict Lambda** (or a downstream consumer) reads the enriched event, fetches online features from Redis, calls the model, and logs to DynamoDB
+
+This decouples ingestion from inference — if the model is slow or downstream processing fails, events aren't lost (SQS retries). Ingestion and inference can scale independently.
+
 ## Phases
 
 1. Feature engineering (rolling aggregates, offline/online split)
 2. Model training (SMOTE, PR-AUC, MLflow tracking)
-3. Custom container with FastAPI + Lambda RIC
+3. Custom container with FastAPI + Fargate
 4. TypeScript inference API with feature merge
-5. GitHub Actions CI/CD with canary deployment
-6. Drift monitoring and automated retraining
+5. GitHub Actions CI/CD with rolling deployment
+6. EventBridge ingestion + SQS decoupling
+7. Drift monitoring and automated retraining
