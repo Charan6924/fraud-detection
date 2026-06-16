@@ -4,7 +4,7 @@ from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearc
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 import numpy as np
-from sklearn.metrics import f1_score, average_precision_score, confusion_matrix
+from sklearn.metrics import f1_score, confusion_matrix
 from sklearn.impute import SimpleImputer
 import os
 import joblib

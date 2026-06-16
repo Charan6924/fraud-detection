@@ -21,7 +21,7 @@ jobs:
           cache: npm
 
       - run: npm ci 
-      - run: npm tsc --noEmit -p packages/api/tsconfig.json
+      - run: npx tsc --noEmit -p packages/api/tsconfig.json
 
   lint:
     name: Python Lint
