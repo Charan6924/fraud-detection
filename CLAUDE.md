@@ -24,11 +24,11 @@ This project touches every layer of the ML lifecycle:
 
 ### Production Flow
 
-Transactions arrive as events from a client or upstream payment processor. An **API Gateway** routes each request to a TypeScript Lambda function, which fetches pre-computed online features from a Redis-backed feature store, invokes a containerized model Lambda, and writes the prediction to a database.
+Transactions arrive as events from a client or upstream payment processor. An **API Gateway** routes each request to a TypeScript Lambda function, which fetches pre-computed online features from a Redis-backed feature store, invokes the model on ECS Fargate via HTTP, and writes the prediction to a database.
 
 ### CI/CD Flow
 
-Every push to `main` triggers GitHub Actions. The pipeline validates data quality, runs the Python training job on a compute instance, evaluates the new model against promotion gates, and — if all gates pass — deploys the updated Lambda functions and registers the new model version. The deployment uses a weighted Lambda alias to canary 10% of traffic before full rollout.
+Every push to `main` triggers GitHub Actions. The pipeline validates data quality, runs the Python training job on a compute instance, evaluates the new model against promotion gates, and — if all gates pass — deploys the updated Fargate service and registers the new model version. The deployment uses a rolling update with zero downtime.
 
 ---
 
@@ -41,7 +41,7 @@ Every push to `main` triggers GitHub Actions. The pipeline validates data qualit
 | API layer | AWS API Gateway + Lambda |
 | Event ingestion | AWS EventBridge, SQS |
 | Feature store | Upstash Redis (online), S3 + Parquet (offline) |
-| Model hosting | Custom Docker container on Lambda (container image) |
+| Model hosting | ECS Fargate (custom Docker container) |
 | Training language | Python 3.11 |
 | Training framework | XGBoost, scikit-learn, imbalanced-learn |
 | Experiment tracking | MLflow (self-hosted on EC2 or managed) |
@@ -67,7 +67,7 @@ Columns include anonymized PCA features `V1–V28`, a raw `Amount`, a `Time` off
 fraud-detection/
 ├── container/                   # Custom model inference container
 │   ├── Dockerfile               # Multi-stage: Python + XGBoost + model artifact
-│   ├── app.py                   # FastAPI inference server with Lambda RIE
+│   ├── app.py                   # FastAPI inference server
 │   └── requirements.txt         # xgboost, scikit-learn, fastapi, etc.
 │
 ├── packages/
@@ -137,13 +137,13 @@ A new model is registered in the MLflow Model Registry and marked as a candidate
 
 ---
 
-## Phase 3 — Model Hosting (Custom Docker Container on Lambda)
+## Phase 3 — Model Hosting (ECS Fargate)
 
-### Why Build Your Own Container
+### Why Fargate
 
-Rather than using a managed inference service, the trained model is packaged into a **custom Docker container** and deployed as a Lambda function using container image support. This forces you to own the entire serving stack: model loading on startup, request serialization, the HTTP server interface, and the Lambda Runtime Interface Client (RIC). No black boxes.
+The trained model runs in a **custom Docker container** on ECS Fargate. Unlike Lambda, Fargate provides a long-running service with consistent performance — no cold starts, no 15-minute timeout, and full control over CPU/memory. This is the right choice for the ensemble model (XGBoost + Random Forest + meta-model) which needs predictable resources for every inference.
 
-The container uses a multi-stage build: the first stage installs Python dependencies (XGBoost, scikit-learn, FastAPI) and copies the serialized model artifact from S3, the second stage strips build tooling to minimize image size. The resulting image is pushed to Amazon ECR and registered as a Lambda function.
+The container uses a multi-stage build: the first stage installs Python dependencies (XGBoost, scikit-learn, FastAPI) and copies the serialized model artifact, the second stage strips build tooling to minimize image size. The resulting image is pushed to Amazon ECR and deployed as a Fargate service behind a load balancer.
 
 ### Container Design
 
@@ -154,19 +154,11 @@ container/
 └── requirements.txt
 ```
 
-The `app.py` runs a FastAPI server inside the Lambda Runtime Interface. On startup it loads the XGBoost model into memory (warm start). Each invocation receives a JSON payload of pre-computed features, runs `model.predict()`, and returns the prediction score and confidence. The Lambda RIC adapter handles the translation between API Gateway's `Invoke` payload and the HTTP server.
+The `app.py` runs a standard FastAPI server. On startup it loads the model ensemble into memory. Each request receives a JSON payload of pre-computed features, runs `model.predict()`, and returns the prediction score and confidence. No Lambda-specific adapter needed — plain HTTP.
 
-### Cold Start Mitigation
+### Deployment
 
-Container Lambda cold starts are the main challenge — the image must be pulled and extracted before the first request. Mitigations include:
-
-- **Provisioned Concurrency** — keep 1 container warm for steady-state traffic
-- **Multi-stage Docker build** — minimize image size by excluding training code and dev dependencies
-- **Model pre-loading** — the model artifact is copied into the image at build time, not downloaded at runtime (avoids S3 latency on cold start)
-
-### Canary Rollouts with Lambda Aliases
-
-Lambda weighted aliases handle gradual rollouts. A new container version is published as `$LATEST`, then the production alias shifts traffic: 10% → 50% → 100% over a monitoring window. If the error rate or latency exceeds thresholds, the alias snaps back to the previous version. No SageMaker required.
+The Fargate service is defined in `sst.config.ts` using `sst.aws.Service`, which provisions an ECS cluster, task definition, and an Application Load Balancer. Rolling updates replace tasks gradually with zero downtime. The Next.js API calls the model service via its ALB URL.
 
 ---
 
@@ -174,7 +166,7 @@ Lambda weighted aliases handle gradual rollouts. A new container version is publ
 
 ### Predict Lambda
 
-The core of the serving layer is a TypeScript Lambda function sitting behind API Gateway. When a transaction request arrives, the handler pulls the card's online features from Upstash Redis, merges them with the payload, invokes the container Lambda via the AWS SDK `Invoke` command, and writes the prediction result to DynamoDB. The full round-trip — feature fetch, model call, DB write — is designed to complete in under 100ms at p99.
+The core of the serving layer is a TypeScript Lambda function sitting behind API Gateway. When a transaction request arrives, the handler pulls the card's online features from Upstash Redis, merges them with the payload, calls the Fargate model service via HTTP POST, and writes the prediction result to DynamoDB. The full round-trip — feature fetch, model call, DB write — is designed to complete in under 100ms at p99.
 
 The handler is strongly typed end-to-end: the request schema, the feature shape, the container Lambda response, and the DynamoDB record are all defined as TypeScript types in the `core` package, shared across all Lambda functions.
 
@@ -200,7 +192,7 @@ Triggered on merges to `main` that touch the `ml/` directory, on a weekly schedu
 
 ### Deploy Pipeline
 
-Triggered by a successful training run. Builds the Docker image using the multi-stage Dockerfile, pushes it to ECR, runs `sst deploy` to update all Lambda functions (including the container Lambda with the new image URI), shifts 10% of traffic to the new Lambda alias, monitors CloudWatch metrics for 30 minutes, and rolls to 100% if no alarms fire. On failure at any step the pipeline snaps the alias back to the previous container version and alerts via a Slack Lambda.
+Triggered by a successful training run. Builds the Docker image using the multi-stage Dockerfile, pushes it to ECR, runs `sst deploy` to update the Fargate service (rolling update with zero downtime), monitors CloudWatch metrics for 30 minutes, and rolls back if any alarms fire. On failure the previous task definition is re-deployed.
 
 ---
 
@@ -210,13 +202,13 @@ Triggered by a successful training run. Builds the Docker image using the multi-
 
 **Model health** is tracked by the Monitor Lambda using Evidently: it watches input feature distributions for drift using the Population Stability Index, monitors prediction distribution shift (is the model suddenly calling everything fraud or nothing fraud?), and tracks data quality metrics like null rates.
 
-**Infrastructure health** is tracked in CloudWatch: Lambda invocation errors, p50/p95/p99 latency for the Predict Lambda, container Lambda cold start frequency and duration, SQS queue depth for the ingest path, and DynamoDB read/write capacity.
+**Infrastructure health** is tracked in CloudWatch: Lambda invocation errors, p50/p95/p99 latency for the Predict Lambda, Fargate service CPU/memory utilization and request latency, SQS queue depth for the ingest path, and DynamoDB read/write capacity.
 
 **Business metrics** are tracked with a delay: chargebacks are joined back to predictions weekly to compute the real false negative rate, closing the ground-truth feedback loop.
 
 ### Alerting
 
-CloudWatch alarms notify a Slack channel (via a simple webhook Lambda) when: prediction Lambda error rate exceeds 1%, p99 latency exceeds 150ms, the container Lambda error rate exceeds 1%, or the drift ratio exceeds the retraining threshold. The monitoring Lambda also writes a weekly summary report to S3 as a JSON artifact for auditing.
+CloudWatch alarms notify a Slack channel (via a simple webhook Lambda) when: prediction Lambda error rate exceeds 1%, p99 latency exceeds 150ms, the Fargate service error rate exceeds 1%, or the drift ratio exceeds the retraining threshold. The monitoring Lambda also writes a weekly summary report to S3 as a JSON artifact for auditing.
 
 ---
 
@@ -232,7 +224,7 @@ By completing this project you will have hands-on experience with:
 
 - **Imbalanced classification** — SMOTE, class weights, threshold tuning, PR-AUC vs ROC-AUC
 - **Feature stores** — online vs offline serving, preventing training-serving skew
-- **Custom model container** — Docker multi-stage builds, Lambda container image support, cold start profiling
+- **Custom model container** — Docker multi-stage builds, ECS Fargate deployment, load-balanced inference
 - **TypeScript on AWS** — Lambda handlers, SST/CDK infrastructure-as-code, strong typing end-to-end
 - **Event-driven architecture** — EventBridge, SQS, DynamoDB Streams
 - **Experiment tracking** — MLflow runs, parameters, metrics, artifact storage
@@ -269,7 +261,7 @@ By completing this project you will have hands-on experience with:
 | **Inference model** | Full ensemble (XGBoost + RF + meta-model) | Higher accuracy; container can handle the weight |
 | **API framework** | Next.js 15 app router (API routes) | Serverless-native, deploys via SST/OpenNext on Lambda |
 | **Infrastructure** | SST v3 (AWS CDK) | Stays fully on AWS, teaches IaC, free tier viable |
-| **Model hosting** | Custom Docker container on Lambda | Full control over Python ML stack, no managed service lock-in |
+| **Model hosting** | ECS Fargate (custom Docker container) | Full control over Python ML stack, consistent performance, no cold starts |
 | **Preprocessing** | Python in the container | Avoids training-serving skew; no fragile TypeScript reimplementation |
 | **Database** | DynamoDB (pay-per-request) | Serverless, free tier covers this project |
 | **Feature store** | Upstash Redis (free tier) | Online features for real-time inference |
