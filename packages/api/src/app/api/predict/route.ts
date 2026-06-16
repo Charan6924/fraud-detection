@@ -3,7 +3,10 @@ import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { NextRequest, NextResponse } from "next/server";
 import type { TransactionInput, PredictionResult } from "core";
 
-const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}));
+const ddbClient = process.env.DYNAMODB_ENDPOINT
+  ? new DynamoDBClient({ endpoint: process.env.DYNAMODB_ENDPOINT, region: "local", credentials: { accessKeyId: "fake", secretAccessKey: "fake" } })
+  : new DynamoDBClient({});
+const ddb = DynamoDBDocumentClient.from(ddbClient);
 
 export async function POST(req: NextRequest) {
   const input: TransactionInput = await req.json();
