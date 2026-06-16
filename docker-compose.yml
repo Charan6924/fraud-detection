@@ -29,7 +29,7 @@ services:
     depends_on:
       - dynamodb
 
-model:
+  model:
     build:
       context: ./container
     ports:
