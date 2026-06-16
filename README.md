@@ -1,64 +1,181 @@
 # Credit Card Fraud Detection
 
-End-to-end ML system that classifies transactions as fraudulent or legitimate in real time. Python handles training and model artifacts; TypeScript handles inference serving and infrastructure.
+End-to-end ML system that classifies transactions as fraudulent or legitimate in real time. Python handles training and model artifacts; TypeScript/Next.js handles inference serving and infrastructure.
+
+Trained on the **IEEE-CIS Fraud Detection** dataset — a large-scale, real-world transaction dataset with extensive identity and transactional features. Uses a stacking ensemble of XGBoost, Random Forest, and Logistic Regression with a meta-model for final prediction.
 
 ## Architecture
 
-- **Containerized model** — XGBoost trained on the Kaggle credit card fraud dataset, packaged in a custom Docker container and deployed on Lambda
-- **Serverless inference** — TypeScript Lambda fetches online features from Redis, invokes the container model Lambda, and logs predictions to DynamoDB
-- **Feature store** — rolling window aggregates per card (tx count, avg spend, z-score) served from Upstash Redis
-- **CI/CD** — GitHub Actions pipelines for training, evaluation with promotion gates, container build/push, and canary rollout via Lambda weighted aliases
-- **Monitoring** — Evidently drift detection on a scheduled Lambda, auto-triggers retraining when drift exceeds threshold
+```
+Client / Payment Processor
+        │
+        ▼
+  Next.js API (API Routes)
+  ┌─────────────────────────────┐
+  │  POST /api/predict          │
+  │  GET  /api/transactions     │
+  │  GET  /api/health           │
+  └──────┬──────────────────────┘
+         │ HTTP
+         ▼
+  ECS Fargate (Model Container)
+  ┌─────────────────────────────┐
+  │  FastAPI server             │
+  │  Ensemble: XGBoost + RF + LR│
+  │  + meta-model               │
+  └──────┬──────────────────────┘
+         │ write
+         ▼
+  DynamoDB (Predictions Log)
+```
+
+- **Ensemble model** — XGBoost (handles NaN natively) + Random Forest + Logistic Regression, stacked with a Logistic Regression meta-model. Imputation via `SimpleImputer` for RF/LR. Threshold tuned at 0.10 for fraud class recall.
+- **Inference API** — Next.js 15 App Router API routes. Accepts transaction JSON, forwards to the model container over HTTP, writes prediction + metadata to DynamoDB.
+- **Container** — FastAPI server in a Docker container running on ECS Fargate. Loads all model artifacts at startup. Preprocessing (log transform, scaling, imputation) happens in Python in the container to prevent training-serving skew.
+- **Infrastructure** — SST v3 (AWS CDK). Defines DynamoDB table, ECS Fargate cluster + service with ALB, and Next.js deployment.
+- **CI/CD** — GitHub Actions: CI runs TypeScript type-check + Python lint (ruff). CD runs `sst deploy` to update AWS infra.
+- **Local dev** — Docker Compose with DynamoDB Local, the model container, and the Next.js API all wired together.
 
 ## Stack
 
 | Layer | Technology | Purpose |
 |---|---|---|
-| Model training | Python, XGBoost, scikit-learn, imbalanced-learn | Imbalanced classification with SMOTE + class weights |
-| Experiment tracking | MLflow | Parameter/metric logging, model registry, promotion gates |
-| Inference container | Python, FastAPI, Docker, Lambda RIC | Self-built model serving container |
-| Serving runtime | TypeScript, Node.js 20, AWS SDK | API handlers, feature merge, orchestrator calls |
-| API layer | AWS API Gateway + Lambda | Request routing, auth, rate limiting |
-| Event ingestion | AWS EventBridge, SQS | Async transaction ingestion, decoupled processing |
-| Feature store | Upstash Redis (online), S3 + Parquet (offline) | Sub-ms feature lookup at inference, batch for training |
-| Database | DynamoDB | Prediction log with TTL-based retention |
-| IaC | AWS SST v3 / CDK | Infrastructure as code, live Lambda dev |
-| CI/CD | GitHub Actions | Training pipeline, container build, canary deploy |
-| Monitoring | Evidently AI, AWS CloudWatch | Drift detection, latency alarms, retraining triggers |
+| Model training | Python, XGBoost, scikit-learn, imbalanced-learn | Stacking ensemble (XGBoost + RF + LR + meta) |
+| Data | IEEE-CIS Fraud Detection (transaction + identity) | Real-world transaction dataset with feature-rich columns |
+| Inference container | Python, FastAPI, Docker, ECS Fargate | Model serving via HTTP |
+| API server | Next.js 15 (App Router), TypeScript | Predict endpoint, transaction history, health check |
+| Database | DynamoDB (pay-per-request) | Prediction log with full input/output/timestamp |
+| Infrastructure | SST v3 / AWS CDK | DynamoDB, ECS Fargate, Next.js deployment |
+| CI/CD | GitHub Actions | Type-check, lint, SST deploy |
+| Local dev | Docker Compose | DynamoDB Local + model container + API |
 
-## Local Dev
+## Project Structure
+
+```
+fraud-detection/
+├── container/                       # Model inference container
+│   ├── Dockerfile                   # Python 3.12 slim, uvicorn
+│   ├── app.py                       # FastAPI server (/predict, /health)
+│   ├── inference.py                 # Ensemble inference logic
+│   ├── preprocess.py                # Feature preprocessing (log, scale, impute)
+│   ├── schemas.py                   # Pydantic request schema
+│   ├── features.py                  # Feature column definitions
+│   ├── requirements.txt
+│   └── model/                       # Trained artifacts (joblib)
+│       ├── xgboost_model.joblib
+│       ├── random_forest_model.joblib
+│       ├── logistic_reg_model.joblib
+│       ├── meta_model.joblib
+│       ├── scaler.joblib
+│       └── imputer.joblib
+│
+├── packages/
+│   ├── api/                         # Next.js 15 API
+│   │   └── src/app/api/
+│   │       ├── predict/route.ts     # POST — run inference
+│   │       ├── transactions/route.ts# GET — query predictions
+│   │       └── health/route.ts      # GET — health check
+│   └── core/                        # Shared TypeScript types
+│       └── src/index.ts             # TransactionInput, PredictionResult, etc.
+│
+├── ml/
+│   ├── features/
+│   │   ├── build_features.py        # Full feature pipeline (IEEE-CIS dataset)
+│   │   └── feature_selection.py     # Feature importance analysis
+│   └── training/
+│       ├── train.py                 # XGBoost baseline training
+│       ├── ensemble.py              # Stacking ensemble training + CV
+│       ├── grid_search.py           # Hyperparameter search
+│       ├── threshold_tuning.py      # Fraud-class threshold optimization
+│       ├── tune_meta.py             # Meta-model tuning
+│       └── feature_select.py        # Feature selection utilities
+│
+├── sst.config.ts                    # SST v3 infrastructure definition
+├── docker-compose.yml               # Local dev environment
+├── .github/workflows/
+│   ├── ci.yaml                      # Type-check + lint
+│   └── deploy.yaml                  # SST deploy to AWS
+└── package.json
+```
+
+## API Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/predict` | Submit a transaction, get fraud prediction |
+| GET | `/api/transactions` | List recent predictions (limit 50) |
+| GET | `/api/transactions?id=<uuid>` | Get a specific prediction |
+| GET | `/api/health` | API + container health check |
+
+### Predict Request
+
+```json
+{
+  "TransactionAmt": 150.00,
+  "card1": 12345,
+  "card2": 500.0,
+  "addr1": 123.0,
+  "P_emaildomain": 5.0
+}
+```
+
+All fields except `TransactionAmt` are optional — missing values are handled by the preprocessing pipeline.
+
+### Predict Response
+
+```json
+{
+  "prediction": 1,
+  "probability": 0.87,
+  "probabilities_per_model": {
+    "xgboost": 0.82,
+    "random_forest": 0.79,
+    "logistic_regression": 0.71
+  },
+  "model_version": "ensemble_v1"
+}
+```
+
+## Local Development
 
 ```bash
-sst dev              # live-reload Lambda handlers
-docker compose up    # Redis + model container + DynamoDB Local
+# Start all services (DynamoDB Local + model container + API)
+docker compose up
+
+# The API is available at http://localhost:3000
+# The model container is at http://localhost:8001
+
+# SST dev (live Lambda reload for AWS dev)
+npm run dev
 ```
 
-## Planned: EventBridge Ingestion
+## Training
 
-The goal is to decouple transaction ingestion from prediction via an event-driven pipeline:
+The ML pipeline is in `ml/`. To run training:
 
+```bash
+# Feature engineering (requires IEEE-CIS CSV data in data/)
+cd ml/features && python build_features.py
+
+# Train stacking ensemble
+cd ml/training && python ensemble.py
+
+# Threshold tuning
+python threshold_tuning.py
 ```
-Payment Processor / Replay Script
-        │
-        ▼
-  EventBridge Bus ──→ Ingest Lambda ──→ SQS ──→ Predict Lambda ──→ DynamoDB
-                              │
-                              ▼
-                          Redis (online features)
-```
 
-1. A **replay script** publishes each transaction from the Kaggle dataset as an event to EventBridge
-2. **Ingest Lambda** picks up the event, computes online features (rolling aggregates per card), writes them to Redis, and forwards the enriched event to SQS
-3. **Predict Lambda** (or a downstream consumer) reads the enriched event, fetches online features from Redis, calls the model, and logs to DynamoDB
+Trained models are copied to `container/model/` for packaging in the Docker image.
 
-This decouples ingestion from inference — if the model is slow or downstream processing fails, events aren't lost (SQS retries). Ingestion and inference can scale independently.
+## CI/CD
 
-## Phases
+- **CI** — Runs on every push/PR to `main`. TypeScript type-check (`tsc --noEmit`) across the API package, and Python lint (`ruff check`) on container and ML code.
+- **CD** — On push to `main`, runs `sst deploy --stage production` which builds the Docker image, pushes to ECR, and updates the Fargate service with zero-downtime rolling deployment.
 
-1. Feature engineering (rolling aggregates, offline/online split)
-2. Model training (SMOTE, PR-AUC, MLflow tracking)
-3. Custom container with FastAPI + Fargate
-4. TypeScript inference API with feature merge
-5. GitHub Actions CI/CD with rolling deployment
-6. EventBridge ingestion + SQS decoupling
-7. Drift monitoring and automated retraining
+## What's Next
+
+- [ ] Feature store (Upstash Redis for online features, S3 + Parquet for offline)
+- [ ] Event-driven ingestion (EventBridge + SQS for async transaction processing)
+- [ ] Drift monitoring (Evidently AI on a scheduled Lambda)
+- [ ] Automated retraining when drift exceeds threshold
+- [ ] MLflow experiment tracking + model registry
+- [ ] Inference explainability (SHAP values in response)
