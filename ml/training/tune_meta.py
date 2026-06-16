@@ -49,7 +49,7 @@ def tune_meta():
         print(f'OOF Fold : {fold + 1}')
         X_tr, X_val = X_train.iloc[train_idx], X_train.iloc[val_idx]
         X_tr_imp, X_val_imp = X_train_imp[train_idx], X_train_imp[val_idx]
-        y_tr, y_val = y_train.iloc[train_idx], y_train.iloc[val_idx]
+        y_tr, _ = y_train.iloc[train_idx], y_train.iloc[val_idx]
 
         xgboost_model.fit(X_tr, y_tr)
         oof_xgb[val_idx] = xgboost_model.predict_proba(X_val)[:, 1].reshape(-1, 1)
