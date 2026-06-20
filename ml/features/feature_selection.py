@@ -11,17 +11,19 @@ def get_features():
     y = df["isFraud"]
 
     model = xgboost.XGBClassifier(
-        n_estimators=100, max_depth=5, learning_rate=0.1,
-        importance_type="gain", eval_metric="logloss",
+        n_estimators=100,
+        max_depth=5,
+        learning_rate=0.1,
+        importance_type="gain",
+        eval_metric="logloss",
         tree_method="hist",
         random_state=42,
     )
     model.fit(X, y)
 
-    importance = pd.DataFrame({
-        "feature": X.columns,
-        "importance": model.feature_importances_
-    }).sort_values("importance", ascending=False)
+    importance = pd.DataFrame(
+        {"feature": X.columns, "importance": model.feature_importances_}
+    ).sort_values("importance", ascending=False)
 
     return importance
 

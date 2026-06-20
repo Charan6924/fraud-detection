@@ -16,5 +16,3 @@ def predict(transaction: TransactionInput):
     features = preprocess(transaction=transaction)
     result = inference(features, lr, rf, xgb, meta, imputer)
     return result
-
-

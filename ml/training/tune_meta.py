@@ -11,24 +11,31 @@ import joblib
 
 
 def tune_meta():
-    df = pd.read_parquet('/home/cxv166/fraud-detection/data/features.parquet')
-    X = df.drop(columns='isFraud')
-    y = df['isFraud']
+    df = pd.read_parquet("/home/cxv166/fraud-detection/data/features.parquet")
+    X = df.drop(columns="isFraud")
+    y = df["isFraud"]
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
 
     xgboost_model = xgboost.XGBClassifier(
-        n_estimators=500, max_depth=12, learning_rate=0.2,
-        subsample=0.8, colsample_bytree=1.0, min_child_weight=1,
-        tree_method="hist", device="cuda",
-        random_state=42)
+        n_estimators=500,
+        max_depth=12,
+        learning_rate=0.2,
+        subsample=0.8,
+        colsample_bytree=1.0,
+        min_child_weight=1,
+        tree_method="hist",
+        device="cuda",
+        random_state=42,
+    )
     scale = (y_train == 0).sum() / (y_train == 1).sum()
     xgboost_model.set_params(scale_pos_weight=scale)
 
     random_forest = RandomForestClassifier(
-        n_estimators=500, max_depth=15,
+        n_estimators=500,
+        max_depth=15,
         min_samples_leaf=20,
         class_weight="balanced",
         n_jobs=-1,
@@ -46,7 +53,7 @@ def tune_meta():
     X_test_imp = imputer.transform(X_test)
 
     for fold, (train_idx, val_idx) in enumerate(cv.split(X_train, y_train)):
-        print(f'OOF Fold : {fold + 1}')
+        print(f"OOF Fold : {fold + 1}")
         X_tr, X_val = X_train.iloc[train_idx], X_train.iloc[val_idx]
         X_tr_imp, X_val_imp = X_train_imp[train_idx], X_train_imp[val_idx]
         y_tr, _ = y_train.iloc[train_idx], y_train.iloc[val_idx]
@@ -57,7 +64,9 @@ def tune_meta():
         random_forest.fit(X_tr_imp, y_tr)
         oof_rf[val_idx] = random_forest.predict_proba(X_val_imp)[:, 1].reshape(-1, 1)
 
-        lr = LogisticRegression(max_iter=1000, class_weight="balanced", C=0.1, random_state=42)
+        lr = LogisticRegression(
+            max_iter=1000, class_weight="balanced", C=0.1, random_state=42
+        )
         lr.fit(X_tr_imp, y_tr)
         oof_lr[val_idx] = lr.predict_proba(X_val_imp)[:, 1].reshape(-1, 1)
 
@@ -71,7 +80,10 @@ def tune_meta():
     }
     meta_search = GridSearchCV(
         LogisticRegression(max_iter=1000, random_state=42),
-        meta_grid, cv=5, scoring="average_precision", verbose=1
+        meta_grid,
+        cv=5,
+        scoring="average_precision",
+        verbose=1,
     )
     meta_search.fit(stacked, y_train)
     print(f"Best meta params: {meta_search.best_params_}")
@@ -79,17 +91,25 @@ def tune_meta():
 
     xgboost_model.fit(X_train, y_train)
     random_forest.fit(X_train_imp, y_train)
-    lr_full = LogisticRegression(max_iter=1000, class_weight="balanced", C=0.1, random_state=42)
+    lr_full = LogisticRegression(
+        max_iter=1000, class_weight="balanced", C=0.1, random_state=42
+    )
     lr_full.fit(X_train_imp, y_train)
 
-    test_preds = np.column_stack([
-        xgboost_model.predict_proba(X_test)[:, 1],
-        random_forest.predict_proba(X_test_imp)[:, 1],
-        lr_full.predict_proba(X_test_imp)[:, 1],
-    ])
+    test_preds = np.column_stack(
+        [
+            xgboost_model.predict_proba(X_test)[:, 1],
+            random_forest.predict_proba(X_test_imp)[:, 1],
+            lr_full.predict_proba(X_test_imp)[:, 1],
+        ]
+    )
     y_prob = meta_search.best_estimator_.predict_proba(test_preds)[:, 1]
 
-    print(f"{'thresh':>6} | {'F1':>5} | {'FNR':>6} | {'FP':>4} | {'FN':>4} | {'TP':>4} | {'cost':>6}")
+    header = (
+        f"{'thresh':>6} | {'F1':>5} | {'FNR':>6} |"
+        f" {'FP':>4} | {'FN':>4} | {'TP':>4} | {'cost':>6}"
+    )
+    print(header)
     print("-" * 55)
 
     cost_fraud, cost_review = 150, 5
@@ -100,26 +120,46 @@ def tune_meta():
         fnr = fn / (fn + tp)
         f1 = f1_score(y_test, y_pred)
         cost = fn * cost_fraud + fp * cost_review
-        results.append({"threshold": thresh, "cost": cost, "fnr": fnr, "f1": f1, "fp": fp, "fn": fn, "tp": tp})
-        print(f"{thresh:>5.2f}  | {f1:.4f} | {fnr:.2%} | {fp:>4} | {fn:>4} | {tp:>4} | {cost:>5}")
+        results.append(
+            {
+                "threshold": thresh,
+                "cost": cost,
+                "fnr": fnr,
+                "f1": f1,
+                "fp": fp,
+                "fn": fn,
+                "tp": tp,
+            }
+        )
+        print(
+            f"{thresh:>5.2f}  | {f1:.4f} | {fnr:.2%} |"
+            f" {fp:>4} | {fn:>4} | {tp:>4} | {cost:>5}"
+        )
 
-    candidates = [r for r in results if r['fp'] <= 900]
-    best = min(candidates, key=lambda r: r['cost'])
-    print(f"\nBest (cost): threshold={best['threshold']:.2f}, FNR={best['fnr']:.2%}, F1={best['f1']:.4f}, FP={best['fp']}")
+    candidates = [r for r in results if r["fp"] <= 900]
+    best = min(candidates, key=lambda r: r["cost"])
+    print(
+        f"\nBest (cost): threshold={best['threshold']:.2f},"
+        f" FNR={best['fnr']:.2%}, F1={best['f1']:.4f}, FP={best['fp']}"
+    )
 
-    print("\nSaving tuned ensemble...")                                                                                                 
-    model_dir = '/home/cxv166/fraud-detection/models'                                                                                   
-    os.makedirs(model_dir, exist_ok=True)                                                                                               
-    joblib.dump(meta_search.best_estimator_, os.path.join(model_dir, "meta_model.joblib"))                                              
-    joblib.dump(xgboost_model, os.path.join(model_dir, "xgboost_model.joblib"))                                                         
-    joblib.dump(random_forest, os.path.join(model_dir, "random_forest_model.joblib"))                                                   
-    joblib.dump(lr_full, os.path.join(model_dir, "linear_reg_model.joblib"))                                                            
-    print(f"Saved. Recommended threshold = {best['threshold']:.2f}")   
-if __name__ == '__main__':
+    print("\nSaving tuned ensemble...")
+    model_dir = "/home/cxv166/fraud-detection/models"
+    os.makedirs(model_dir, exist_ok=True)
+    joblib.dump(
+        meta_search.best_estimator_, os.path.join(model_dir, "meta_model.joblib")
+    )
+    joblib.dump(xgboost_model, os.path.join(model_dir, "xgboost_model.joblib"))
+    joblib.dump(random_forest, os.path.join(model_dir, "random_forest_model.joblib"))
+    joblib.dump(lr_full, os.path.join(model_dir, "linear_reg_model.joblib"))
+    print(f"Saved. Recommended threshold = {best['threshold']:.2f}")
+
+
+if __name__ == "__main__":
     tune_meta()
 
 
-'''
+"""
 Best meta params: {'C': 0.01, 'penalty': 'l1', 'solver': 'liblinear'}
 Best CV score:    0.7983
 thresh |    F1 |    FNR |   FP |   FN |   TP |   cost
@@ -144,4 +184,4 @@ thresh |    F1 |    FNR |   FP |   FN |   TP |   cost
  0.90  | 0.7653 | 36.46% |  104 | 1507 | 2626 | 226570
 
 Best (cost): threshold=0.10, FNR=22.70%, F1=0.8068, FP=592
-'''
+"""

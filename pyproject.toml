@@ -15,4 +15,6 @@ dependencies = [
     "preprocess>=2.0.0",
     "fastapi>=0.137.0",
     "mangum>=0.21.0",
+    "evidently>=0.7.21",
+    "boto3>=1.43.34",
 ]

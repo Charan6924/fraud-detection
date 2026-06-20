@@ -16,6 +16,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 def _pr_auc(y_true, y_prob):
     return average_precision_score(y_true, y_prob)
 
+
 pr_auc_scorer = make_scorer(_pr_auc, response_method="predict_proba")
 
 param_grid = {
@@ -26,6 +27,7 @@ param_grid = {
     "model__colsample_bytree": [0.8, 1.0],
     "model__min_child_weight": [1, 5],
 }
+
 
 def fine_tune():
     print("Loading data")
@@ -38,20 +40,27 @@ def fine_tune():
     print(f"  X shape: {X.shape}, y fraud rate: {y.mean():.4%}")
 
     print("[Train/test split")
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, stratify=y, random_state=42
+    )
     print(f"  Train: {len(X_train)}, Test: {len(X_test)}")
 
     print("Building pipeline")
-    pipeline = ImbPipeline([
-        ("imputer", SimpleImputer(strategy="median")),
-        ("smote", SMOTE(random_state=42)),
-        ("model", xgboost.XGBClassifier(
-            eval_metric="logloss",
-            random_state=42,
-            tree_method="hist",
-            device="cuda",
-        )),
-    ])
+    pipeline = ImbPipeline(
+        [
+            ("imputer", SimpleImputer(strategy="median")),
+            ("smote", SMOTE(random_state=42)),
+            (
+                "model",
+                xgboost.XGBClassifier(
+                    eval_metric="logloss",
+                    random_state=42,
+                    tree_method="hist",
+                    device="cuda",
+                ),
+            ),
+        ]
+    )
 
     print("Setting up grid search")
     cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
@@ -60,7 +69,9 @@ def fine_tune():
     total_fits = 144 * 3
     print(f"  {total_fits} total fits (144 params × 3 folds)")
     t1 = time.time()
-    search = GridSearchCV(pipeline, param_grid=param_grid, scoring=scorer, cv=cv, n_jobs=4, verbose=10)
+    search = GridSearchCV(
+        pipeline, param_grid=param_grid, scoring=scorer, cv=cv, n_jobs=4, verbose=10
+    )
 
     print("Fitting grid search")
     search.fit(X_train, y_train)
@@ -84,7 +95,9 @@ def fine_tune():
     print("Saving model")
     model_dir = os.path.join(PROJECT_ROOT, "models")
     os.makedirs(model_dir, exist_ok=True)
-    joblib.dump(search.best_estimator_, os.path.join(model_dir, "finetuned_model.joblib"))
+    joblib.dump(
+        search.best_estimator_, os.path.join(model_dir, "finetuned_model.joblib")
+    )
     print("Done!")
 
 
