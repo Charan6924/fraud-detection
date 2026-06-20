@@ -27,6 +27,7 @@ export default $config({
       loadBalancer: {
         rules: [{ listen: "80/http" }],
       },
+      link: [predictionsTable],
     });
 
     // Next.js API

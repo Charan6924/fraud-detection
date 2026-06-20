@@ -21,6 +21,9 @@ data/*.parquet
 models/
 container/model/
 
+# Generated reference dataset
+container/reference.parquet
+
 
 # Environment
 .env

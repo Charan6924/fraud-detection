@@ -5,8 +5,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py preprocess.py inference.py schemas.py features.py ./
+COPY app.py preprocess.py inference.py schemas.py features.py drift.py ./
 COPY model/ ./model/
+COPY reference.parquet .
 
 EXPOSE 80
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80"]
