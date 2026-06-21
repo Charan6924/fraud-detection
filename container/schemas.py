@@ -1,5 +1,10 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Literal
+
+
+class FeedbackInput(BaseModel):
+    prediction_id: str
+    label: Literal[0, 1]
 
 
 class TransactionInput(BaseModel):

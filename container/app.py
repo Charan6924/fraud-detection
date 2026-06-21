@@ -1,21 +1,22 @@
-from schemas import TransactionInput
 from preprocess import preprocess
 from inference import inference, lr, rf, xgb, meta, imputer
 from fastapi import FastAPI
 from drift import check_drift
 import boto3
 import os
+from schemas import TransactionInput, FeedbackInput
+from fastapi import HTTPException
+from botocore.exceptions import ClientError
 import pandas as pd
 
 app = FastAPI()
 
-
-def get_production_features():                                                                                                          
-      table = boto3.resource("dynamodb").Table(os.environ["PREDICTIONS_TABLE"])                                                           
-      response = table.scan(Limit=500)                                                                                                    
-      items = response.get("Items", [])                                                                                                                                                                                                                                                                                                                   
-      features = [item["input"] for item in items if "input" in item]                                                                     
-      return pd.DataFrame(features)   
+def get_production_features():
+    table = boto3.resource("dynamodb").Table(os.environ["PREDICTIONS_TABLE"])
+    response = table.scan(Limit=500)
+    items = response.get("Items", [])
+    features = [item["input"] for item in items if "input" in item]
+    return pd.DataFrame(features)
 
 
 @app.get("/health")
@@ -44,3 +45,18 @@ def drift():
         "n_drifted": len(drifted),
         "n_total": len(drift_by_col),
     }
+
+
+@app.post("/feedback")
+def feedback(fb: FeedbackInput):
+    table = boto3.resource("dynamodb").Table(os.environ["PREDICTIONS_TABLE"])
+    try:
+        table.update_item(
+            Key={"id": fb.prediction_id},
+            UpdateExpression="SET #l = :l",
+            ExpressionAttributeNames={"#l": "label"},
+            ExpressionAttributeValues={":l": fb.label},
+        )
+        return {"status": "ok", "prediction_id": fb.prediction_id, "label": fb.label}
+    except ClientError as e:
+        raise HTTPException(status_code=404, detail=f"prediction_id not found: {e}")
