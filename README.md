@@ -23,17 +23,30 @@ Client / Payment Processor
   │  FastAPI server             │
   │  Ensemble: XGBoost + RF + LR│
   │  + meta-model               │
+  │  POST /drift (Evidently AI)  │
+  │  POST /feedback              │
   └──────┬──────────────────────┘
-         │ write
+         │ write / read
          ▼
   DynamoDB (Predictions Log)
+  ──────────────────────
+  ▲ Monitor Lambda (cron, 6h)
+  │  POST /drift → if > 30% drifted
+  │  → GitHub dispatch retrain
+  │
+  └──► Train Pipeline (Fargate RunTask)
+       Download features → train ensemble
+       → upload models to S3 → dispatch deploy
 ```
 
 - **Ensemble model** — XGBoost (handles NaN natively) + Random Forest + Logistic Regression, stacked with a Logistic Regression meta-model. Imputation via `SimpleImputer` for RF/LR. Threshold tuned at 0.10 for fraud class recall.
 - **Inference API** — Next.js 15 App Router API routes. Accepts transaction JSON, forwards to the model container over HTTP, writes prediction + metadata to DynamoDB.
 - **Container** — FastAPI server in a Docker container running on ECS Fargate. Loads all model artifacts at startup. Preprocessing (log transform, scaling, imputation) happens in Python in the container to prevent training-serving skew.
-- **Infrastructure** — SST v3 (AWS CDK). Defines DynamoDB table, ECS Fargate cluster + service with ALB, and Next.js deployment.
-- **CI/CD** — GitHub Actions: CI runs TypeScript type-check + Python lint (ruff). CD runs `sst deploy` to update AWS infra.
+- **Drift detection** — Evidently AI compares production features against a training reference dataset. Monitor Lambda runs every 6 hours, calls POST /drift, dispatches retrain if drift exceeds 30%.
+- **Label feedback** — POST /feedback attaches ground-truth labels to predictions in DynamoDB for retraining.
+- **Retrain loop** — GitHub Actions builds a training Docker image, runs ensemble training as a Fargate task, uploads new model artifacts to S3, then dispatches deploy.
+- **Infrastructure** — SST v3 (AWS CDK). Defines DynamoDB table, S3 bucket, ECS Fargate cluster + service with ALB, Monitor Lambda + Cron, and Next.js deployment.
+- **CI/CD** — GitHub Actions: CI (type-check + lint), deploy (push or repo_dispatch, downloads models from S3), train (monitor-triggered, scheduled, or push to ml/).
 - **Local dev** — Docker Compose with DynamoDB Local, the model container, and the Next.js API all wired together.
 
 ## Stack
@@ -46,7 +59,9 @@ Client / Payment Processor
 | API server | Next.js 15 (App Router), TypeScript | Predict endpoint, transaction history, health check |
 | Database | DynamoDB (pay-per-request) | Prediction log with full input/output/timestamp |
 | Infrastructure | SST v3 / AWS CDK | DynamoDB, ECS Fargate, Next.js deployment |
-| CI/CD | GitHub Actions | Type-check, lint, SST deploy |
+| Monitoring | Evidently AI, CloudWatch, Monitor Lambda | Drift detection, alerting, retrain trigger |
+| CI/CD | GitHub Actions | Type-check, lint, train (Fargate), deploy (SST) |
+| Artifacts | S3 | Features, model artifacts, reference dataset |
 | Local dev | Docker Compose | DynamoDB Local + model container + API |
 
 ## Project Structure
@@ -55,11 +70,13 @@ Client / Payment Processor
 fraud-detection/
 ├── container/                       # Model inference container
 │   ├── Dockerfile                   # Python 3.12 slim, uvicorn
-│   ├── app.py                       # FastAPI server (/predict, /health)
+│   ├── app.py                       # FastAPI server (/predict, /drift, /feedback, /health)
 │   ├── inference.py                 # Ensemble inference logic
 │   ├── preprocess.py                # Feature preprocessing (log, scale, impute)
-│   ├── schemas.py                   # Pydantic request schema
+│   ├── schemas.py                   # Pydantic request schemas
 │   ├── features.py                  # Feature column definitions
+│   ├── drift.py                     # Evidently AI drift computation
+│   ├── reference.parquet            # Training reference for drift comparison
 │   ├── requirements.txt
 │   └── model/                       # Trained artifacts (joblib)
 │       ├── xgboost_model.joblib
@@ -75,16 +92,22 @@ fraud-detection/
 │   │       ├── predict/route.ts     # POST — run inference
 │   │       ├── transactions/route.ts# GET — query predictions
 │   │       └── health/route.ts      # GET — health check
-│   └── core/                        # Shared TypeScript types
-│       └── src/index.ts             # TransactionInput, PredictionResult, etc.
+│   ├── core/                        # Shared TypeScript types
+│   │   └── src/index.ts             # TransactionInput, PredictionResult, etc.
+│   └── monitor/                     # Drift monitoring Lambda
+│       └── src/index.ts             # Handler: calls /drift, dispatches retrain
 │
 ├── ml/
+│   ├── requirements.txt             # Training dependencies
+│   ├── Dockerfile.train             # Training container image
 │   ├── features/
 │   │   ├── build_features.py        # Full feature pipeline (IEEE-CIS dataset)
-│   │   └── feature_selection.py     # Feature importance analysis
+│   │   ├── feature_selection.py     # Feature importance analysis
+│   │   └── generate_reference.py    # Reference dataset for drift detection
 │   └── training/
 │       ├── train.py                 # XGBoost baseline training
 │       ├── ensemble.py              # Stacking ensemble training + CV
+│       ├── fargate_train.py         # Fargate entrypoint: S3 in/out, full training
 │       ├── grid_search.py           # Hyperparameter search
 │       ├── threshold_tuning.py      # Fraud-class threshold optimization
 │       ├── tune_meta.py             # Meta-model tuning
@@ -100,12 +123,23 @@ fraud-detection/
 
 ## API Endpoints
 
+### Next.js API (public)
+
 | Method | Path | Description |
 |---|---|---|
 | POST | `/api/predict` | Submit a transaction, get fraud prediction |
 | GET | `/api/transactions` | List recent predictions (limit 50) |
 | GET | `/api/transactions?id=<uuid>` | Get a specific prediction |
 | GET | `/api/health` | API + container health check |
+
+### Container (internal, via ALB)
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/predict` | Run inference (called by Next.js API) |
+| POST | `/drift` | Compute Evidently drift report vs reference dataset |
+| POST | `/feedback` | Attach ground-truth label `{ prediction_id, label }` to a prediction |
+| GET | `/health` | Container health check |
 
 ### Predict Request
 
@@ -169,13 +203,14 @@ Trained models are copied to `container/model/` for packaging in the Docker imag
 ## CI/CD
 
 - **CI** — Runs on every push/PR to `main`. TypeScript type-check (`tsc --noEmit`) across the API package, and Python lint (`ruff check`) on container and ML code.
-- **CD** — On push to `main`, runs `sst deploy --stage production` which builds the Docker image, pushes to ECR, and updates the Fargate service with zero-downtime rolling deployment.
+- **CD** — On push to `main` or `repository_dispatch` (from train pipeline), downloads latest model artifacts from S3 into `container/model/`, then runs `sst deploy --stage production` to build and deploy the inference container.
+- **Train** — Triggered by `repository_dispatch` (from Monitor Lambda when drift > 30%), `workflow_dispatch`, or push to `ml/`. Builds the training Docker image, runs ensemble training as a Fargate task, uploads new model artifacts + reference dataset to S3, then dispatches the deploy workflow.
 
 ## What's Next
 
 - [ ] Feature store (Upstash Redis for online features, S3 + Parquet for offline)
 - [ ] Event-driven ingestion (EventBridge + SQS for async transaction processing)
-- [ ] Drift monitoring (Evidently AI on a scheduled Lambda)
-- [ ] Automated retraining when drift exceeds threshold
 - [ ] MLflow experiment tracking + model registry
 - [ ] Inference explainability (SHAP values in response)
+- [ ] Monitoring hold in deploy pipeline (30-min CloudWatch watch + rollback)
+- [ ] Human review queue for borderline predictions
