@@ -15,6 +15,9 @@ export default $config({
       primaryIndex: { hashKey: "id" },
     });
 
+    // S3 bucket for training artifacts (features, models, reference)
+    const artifactsBucket = new sst.aws.Bucket("Artifacts");
+
     // Container Lambda for model inference
     const vpc = new sst.aws.Vpc("ModelVpc");
     const cluster = new sst.aws.Cluster("ModelCluster", { vpc });
@@ -40,9 +43,24 @@ export default $config({
       },
     });
 
+    const monitorFunction = new sst.aws.Function("MonitorFunction", {
+      handler : "packages/monitor/src/index.handler",
+      link : [predictionsTable],
+      environment : {
+        MODEL_SERVICE_URL : modelService.url,
+        GH_TOKEN : process.env.GH_TOKEN!,
+      }
+    });
+
+    new sst.aws.Cron("MonitorCron", {
+      schedule : "rate(6 hours)",
+      job : monitorFunction.arn,
+    });
+
     return {
       api: api.url,
       model: modelService.url,
+      artifactsBucket: artifactsBucket.name,
     };
   }
 });

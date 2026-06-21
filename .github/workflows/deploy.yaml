@@ -1,14 +1,19 @@
 name: CD Pipeline
 
 on:
+  repository_dispatch:
+    types: [deploy]
   push:
     branches: [main]
 
+env:
+  ARTIFACTS_BUCKET: fraud-detection-artifacts-charan
+  REGION: ap-southeast-2
+
 jobs:
   deploy:
-    name: deploy
     runs-on: ubuntu-latest
-    steps: 
+    steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -17,7 +22,14 @@ jobs:
       - run: npm ci
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-            aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-            aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            aws-region: us-east-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.REGION }}
+
+      - name: Download latest model artifacts
+        run: |
+          mkdir -p container/model
+          aws s3 sync s3://${{ env.ARTIFACTS_BUCKET }}/models/ container/model/ \
+            --region ${{ env.REGION }} || echo "No models in S3, using bundled"
+
       - run: npx sst deploy --stage production

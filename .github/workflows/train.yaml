@@ -1,0 +1,78 @@
+name: Train Pipeline
+
+on:
+  repository_dispatch:
+    types: [retrain]
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "ml/**"
+
+env:
+  ARTIFACTS_BUCKET: fraud-detection-artifacts-charan
+  REGION: ap-southeast-2
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.REGION }}
+
+      - name: Build & push training image
+        run: |
+          REPO=$(aws ecr create-repository --repository-name fraud-detection-training 2>/dev/null \
+            || aws ecr describe-repositories --repository-names fraud-detection-training \
+            --query 'repositories[0].repositoryUri' --output text)
+          aws ecr get-login-password | docker login --username AWS --password-stdin $REPO
+          docker build -f ml/Dockerfile.train -t fraud-detection-training .
+          docker tag fraud-detection-training:latest $REPO:latest
+          docker push $REPO:latest
+          echo "IMAGE=$REPO:latest" >> $GITHUB_ENV
+
+      - name: Run Fargate task
+        run: |
+          CLUSTER=$(aws ecs list-clusters --query 'clusterArns[?contains(@,`ModelCluster`)]' --output text)
+          VPC_ID=$(aws ec2 describe-vpcs --filters 'Name=tag:Name,contains=ModelVpc' \
+            --query 'Vpcs[0].VpcId' --output text)
+          SUBNETS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" \
+            --query 'Subnets[*].SubnetId' --output text | tr '\t' ',')
+          SG=$(aws ec2 describe-security-groups \
+            --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,contains=ModelService" \
+            --query 'SecurityGroups[0].GroupId' --output text)
+
+          TASK_ARN=$(aws ecs run-task \
+            --cluster $CLUSTER \
+            --task-definition fraud-detection-training \
+            --launch-type FARGATE \
+            --network-configuration \
+            "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SG],assignPublicIp=ENABLED}" \
+            --query 'tasks[0].taskArn' --output text)
+          echo "TASK_ARN=$TASK_ARN" >> $GITHUB_ENV
+
+      - name: Wait for completion
+        run: |
+          while true; do
+            STATUS=$(aws ecs describe-tasks --cluster $CLUSTER --tasks $TASK_ARN \
+              --query 'tasks[0].lastStatus' --output text)
+            echo "Status: $STATUS"
+            [ "$STATUS" = "STOPPED" ] && break
+            sleep 30
+          done
+          EXIT=$(aws ecs describe-tasks --cluster $CLUSTER --tasks $TASK_ARN \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+          echo "Exit code: $EXIT"
+          [ "$EXIT" = "0" ]
+
+      - name: Trigger deploy
+        if: success()
+        run: |
+          curl -L -X POST https://api.github.com/repos/${{ github.repository }}/dispatches \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" \
+            -d '{"event_type":"deploy"}'
