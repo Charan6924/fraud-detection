@@ -183,9 +183,101 @@ docker compose up
 npm run dev
 ```
 
+## Drift Detection & Retrain Loop
+
+The system automatically detects when production data has drifted from the training distribution and retrains the model without manual intervention.
+
+### How it works
+
+```
+                    ┌──────────────────────────────────────┐
+                    │  Reference Dataset (training split)  │
+                    │  - 80% of features.parquet           │
+                    │  - Bundled in container as           │
+                    │    reference.parquet                  │
+                    └──────────┬───────────────────────────┘
+                               │
+  Production ─────► DynamoDB   │
+  Predictions      (features)  │
+    stored with    ────────────┤
+    input features             │
+       │                       │
+       ▼                       ▼
+  ┌─────────────────────────────────┐
+  │  POST /drift (FastAPI container)│
+  │  - Evidently DataDriftPreset   │
+  │  - Compares each feature's     │
+  │    distribution (PSI)          │
+  │  - Reports drift_share,        │
+  │    drifted_features list       │
+  └──────────────┬──────────────────┘
+                 │
+      drift_share > 0.30?
+            /        \
+          NO         YES
+          │           │
+     ┌────┘           └──────────────────┐
+     ▼                                    ▼
+  No action                  Monitor Lambda (cron, 6h)
+                             ┌──────────────────────────┐
+                             │  1. POST /drift          │
+                             │  2. Check drift_share    │
+                             │  3. If > 30%: POST       │
+                             │     GitHub dispatch      │
+                             │     event_type: retrain  │
+                             └──────────┬───────────────┘
+                                        │ dispatch
+                                        ▼
+                        ┌───────────────────────────────┐
+                        │  Train Pipeline (train.yaml)  │
+                        │  1. Build training image      │
+                        │  2. Push to ECR               │
+                        │  3. Run Fargate task:         │
+                        │     a. Download features.parquet│
+                        │        from S3                │
+                        │     b. Train ensemble (5-fold │
+                        │        CV, XGBoost + RF + LR) │
+                        │     c. Upload models to S3    │
+                        │     d. Upload new reference   │
+                        │        dataset to S3          │
+                        │  4. Dispatch deploy event     │
+                        └──────────┬────────────────────┘
+                                   │ dispatch
+                                   ▼
+                        ┌───────────────────────────────┐
+                        │  Deploy Pipeline (deploy.yaml)│
+                        │  1. Download models from S3   │
+                        │  2. npx sst deploy            │
+                        │     (zero-downtime rolling    │
+                        │      update)                  │
+                        └───────────────────────────────┘
+```
+
+### Key components
+
+**Reference dataset** — Generated from the training split (80%) of `features.parquet`. Stored as `reference.parquet` and bundled into the container image. This is the baseline distribution that production features are compared against.
+
+**Drift metric** — Uses Evidently AI's `DataDriftPreset` with Population Stability Index (PSI). Each feature column is compared between the production batch and the reference. If the fraction of drifted columns exceeds 30%, drift is flagged.
+
+**Monitor Lambda** — A TypeScript Lambda triggered every 6 hours by an EventBridge cron. It calls `POST /drift` on the model container's ALB. If drift is detected, it posts a `repository_dispatch` event to the GitHub API with event type `retrain`.
+
+**Training pipeline** — A Fargate task that downloads the latest `features.parquet` from S3, runs the full ensemble training (5-fold cross-validated stacking with XGBoost, Random Forest, and Logistic Regression), uploads the new model artifacts and a fresh reference dataset to S3, then dispatches a deploy event.
+
+**Deploy pipeline** — Downloads the latest model artifacts from S3 into `container/model/` before running `sst deploy`, so the new Docker image ships with the freshly trained models.
+
+### Trigger sources
+
+The retrain loop can be triggered three ways:
+
+| Trigger | Source | When |
+|---|---|---|
+| Monitor Lambda | GitHub API dispatch | Drift detected (> 30% drifted features) |
+| Scheduled | `train.yaml` cron | Weekly (Sunday 2am — configured in workflow) |
+| Manual | GitHub UI | `workflow_dispatch` via Actions tab |
+
 ## Training
 
-The ML pipeline is in `ml/`. To run training:
+The ML pipeline is in `ml/`. To run training locally:
 
 ```bash
 # Feature engineering (requires IEEE-CIS CSV data in data/)
