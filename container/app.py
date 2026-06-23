@@ -41,6 +41,8 @@ def predict(transaction: TransactionInput):
 @app.post("/drift")
 def drift():
     production_features = get_production_features()
+    if production_features.empty:
+        return {"drift_detected": False, "drift_share": 0.0, "drifted_features": [], "n_drifted": 0, "n_total": 0}
     result = check_drift(production_features)
     drift_share = result["metrics"][0]["result"]["drift_share"]
     drift_by_col = result["metrics"][0]["result"]["drift_by_columns"]
@@ -56,7 +58,7 @@ def drift():
 
 @app.post("/feedback")
 def feedback(fb: FeedbackInput):
-    table = boto3.resource("dynamodb").Table(os.environ["PREDICTIONS_TABLE"])
+    table = _get_table()
     try:
         table.update_item(
             Key={"id": fb.prediction_id},
