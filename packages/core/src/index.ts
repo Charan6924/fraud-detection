@@ -291,5 +291,6 @@ export interface TransactionRecord {
 
 export interface HealthResponse {
   status: string;
+  container: { status: string };
   timestamp: string;
 }
