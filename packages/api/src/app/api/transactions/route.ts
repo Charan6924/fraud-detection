@@ -1,7 +1,6 @@
 // query the database for previous transactions
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { ScanCommand } from "@aws-sdk/lib-dynamodb";
-import { DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, ScanCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { NextRequest, NextResponse } from "next/server";
 
 const ddbClient = process.env.DYNAMODB_ENDPOINT
