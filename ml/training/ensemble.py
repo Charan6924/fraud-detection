@@ -108,7 +108,7 @@ def ensemble_modelling():
     joblib.dump(meta, os.path.join(model_dir, "meta_model.joblib"))
     joblib.dump(xgboost_model, os.path.join(model_dir, "xgboost_model.joblib"))
     joblib.dump(random_forest, os.path.join(model_dir, "random_forest_model.joblib"))
-    joblib.dump(logistic_regression, os.path.join(model_dir, "linear_reg_model.joblib"))
+    joblib.dump(logistic_regression, os.path.join(model_dir, "logistic_reg_model.joblib"))
     print("Done!")
 
 
