@@ -40,7 +40,7 @@ export async function handler(){
           body: JSON.stringify({ event_type: "retrain" }),                                                                                                 
         },);
         
-        if (!ghRes){
+        if (!ghRes.ok) {
             console.error("Failed to dispatch retrain", await ghRes.text());
         }
 
