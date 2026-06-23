@@ -9,9 +9,11 @@ import joblib
 from sklearn.metrics import f1_score, average_precision_score, confusion_matrix
 from sklearn.impute import SimpleImputer
 
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+
 
 def ensemble_modelling():
-    df = pd.read_parquet("/home/cxv166/fraud-detection/data/features.parquet")
+    df = pd.read_parquet(os.path.join(PROJECT_ROOT, "data/features.parquet"))
     X = df.drop(columns="isFraud")
     y = df["isFraud"]
 
@@ -103,7 +105,7 @@ def ensemble_modelling():
     print(f"  FNR:        {fn / (fn + tp):.4%}")
 
     print("Saving model")
-    model_dir = "/home/cxv166/fraud-detection/models"
+    model_dir = os.path.join(PROJECT_ROOT, "models")
     os.makedirs(model_dir, exist_ok=True)
     joblib.dump(meta, os.path.join(model_dir, "meta_model.joblib"))
     joblib.dump(xgboost_model, os.path.join(model_dir, "xgboost_model.joblib"))
