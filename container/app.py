@@ -10,9 +10,16 @@ from botocore.exceptions import ClientError
 import pandas as pd
 
 app = FastAPI()
+_dynamo_table = None
+
+def _get_table():
+    global _dynamo_table
+    if _dynamo_table is None:
+        _dynamo_table = boto3.resource("dynamodb").Table(os.environ["PREDICTIONS_TABLE"])
+    return _dynamo_table
 
 def get_production_features():
-    table = boto3.resource("dynamodb").Table(os.environ["PREDICTIONS_TABLE"])
+    table = _get_table()
     response = table.scan(Limit=500)
     items = response.get("Items", [])
     features = [item["input"] for item in items if "input" in item]
