@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const modelRes = await fetch(`${process.env.MODEL_SERVICE_URL}/health`);
-  const container = await modelRes.json();
+  let container = { status: "unreachable" };
+  try {
+    const modelRes = await fetch(`${process.env.MODEL_SERVICE_URL}/health`);
+    container = await modelRes.json();
+  } catch {
+    // model service unreachable — return partial status
+  }
 
   return NextResponse.json({
     status: "ok",
