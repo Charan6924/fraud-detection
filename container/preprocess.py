@@ -1,3 +1,5 @@
+"""Preprocess raw transaction input into model-ready feature vectors."""
+
 import pandas as pd
 import numpy as np
 from schemas import TransactionInput
