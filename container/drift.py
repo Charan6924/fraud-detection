@@ -1,3 +1,5 @@
+"""Drift detection using Evidently AI data drift presets."""
+
 from evidently import Dataset
 from evidently import DataDefinition
 from evidently import Report
