@@ -1,3 +1,5 @@
+"""Feature column definitions shared across preprocessing and drift detection."""
+
 FEATURE_COLUMNS = [
     "TransactionAmt",
     "ProductCD",
