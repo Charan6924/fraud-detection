@@ -1,3 +1,5 @@
+"""Ensemble training pipeline for Fargate: downloads features from S3, trains, uploads artifacts."""
+
 import os
 import joblib
 import pandas as pd
