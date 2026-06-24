@@ -1,3 +1,5 @@
+"""Model inference: loads saved ensemble and runs prediction."""
+
 import joblib
 import os
 import numpy as np
