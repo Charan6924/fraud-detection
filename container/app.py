@@ -1,3 +1,5 @@
+"""FastAPI inference server for fraud detection model ensemble."""
+
 from preprocess import preprocess
 from inference import inference, lr, rf, xgb, meta, imputer
 from fastapi import FastAPI
