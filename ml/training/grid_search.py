@@ -1,3 +1,5 @@
+"""Hyperparameter grid search for XGBoost with SMOTE and imbalanced-learn pipeline."""
+
 import joblib
 import os
 from sklearn.metrics import average_precision_score, confusion_matrix, f1_score
