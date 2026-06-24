@@ -1,3 +1,5 @@
+"""Build feature dataset from raw CSV transaction data and train scaler/imputer."""
+
 import os
 import pandas as pd
 import numpy as np
