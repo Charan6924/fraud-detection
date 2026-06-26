@@ -1,0 +1,31 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      npm-deps:
+        patterns: ["*"]
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: "pip"
+    directory: "/container"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      pip-deps:
+        patterns: ["*"]
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      actions-deps:
+        patterns: ["*"]
+    open-pull-requests-limit: 10
