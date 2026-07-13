@@ -1,5 +1,5 @@
 fastapi==0.139.0
-uvicorn==0.50.1
+uvicorn==0.51.0
 xgboost==3.3.0
 scikit-learn==1.9.0
 pandas==3.0.4
@@ -7,4 +7,4 @@ numpy==2.5.1
 joblib==1.5.3
 pydantic==2.13.4
 evidently==0.7.21
-boto3>=1.43.40
+boto3>=1.43.46
