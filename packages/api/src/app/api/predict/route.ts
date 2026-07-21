@@ -2,6 +2,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { NextRequest, NextResponse } from "next/server";
 import type { TransactionInput, PredictionResult } from "core";
+import { checkRateLimit, getCachedPrediction, setCacheEntry } from "core";
 
 const ddbClient = process.env.DYNAMODB_ENDPOINT
   ? new DynamoDBClient({ endpoint: process.env.DYNAMODB_ENDPOINT, region: "local", credentials: { accessKeyId: "fake", secretAccessKey: "fake" } })
@@ -10,6 +11,16 @@ const ddb = DynamoDBDocumentClient.from(ddbClient);
 
 export async function POST(req: NextRequest) {
   const input: TransactionInput = await req.json();
+  const cardId = String(input.card1);
+  const allowed = checkRateLimit(cardId)
+  if (!allowed){
+    return NextResponse.json({error: "Rate limit exceeded"},{status:429})
+  }
+
+  const cached = await getCachedPrediction(cardId,input.TransactionAmt)
+  if (cached){
+    return NextResponse.json(cached)
+  }
 
   const modelRes = await fetch(`${process.env.MODEL_SERVICE_URL}/predict`, {
     method: "POST",
@@ -26,6 +37,8 @@ export async function POST(req: NextRequest) {
   }
 
   const result: PredictionResult = await modelRes.json();
+
+  await setCacheEntry(cardId, input.TransactionAmt, result);
 
   await ddb.send(new PutCommand({
     TableName: process.env.PREDICTIONS_TABLE!,
