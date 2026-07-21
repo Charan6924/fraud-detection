@@ -4,6 +4,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "dependencies": {
+    "@upstash/redis" : "^1.38.0"
+  },
   "devDependencies": {
     "typescript": "^5.7.0"
   }

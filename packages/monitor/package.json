@@ -1,6 +1,6 @@
 {
-    name : "monitor",
-    type : "module",
+    "name": "monitor",
+    "type": "module",
     "devDependencies" : {
         "@types/node" : "^22.0.0",
         "typescript" : "^5.7.0"
