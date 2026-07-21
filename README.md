@@ -40,8 +40,9 @@ Client / Payment Processor
 ```
 
 - **Ensemble model** — XGBoost (handles NaN natively) + Random Forest + Logistic Regression, stacked with a Logistic Regression meta-model. Imputation via `SimpleImputer` for RF/LR. Threshold tuned at 0.10 for fraud class recall.
-- **Inference API** — Next.js 15 App Router API routes. Accepts transaction JSON, forwards to the model container over HTTP, writes prediction + metadata to DynamoDB.
-- **Container** — FastAPI server in a Docker container running on ECS Fargate. Loads all model artifacts at startup. Preprocessing (log transform, scaling, imputation) happens in Python in the container to prevent training-serving skew.
+- **Inference API** — Next.js 15 App Router API routes. Protected by API key auth (`x-api-key` header). Accepts transaction JSON, checks rate limit and dedup cache in Upstash Redis, forwards to the model container over HTTP, writes prediction + metadata to DynamoDB.
+- **Container** — FastAPI server in a Docker container running on ECS Fargate. Protected by an internal shared secret (`x-model-secret` header) so only the Next.js API can call it. Loads all model artifacts at startup. Preprocessing (log transform, scaling, imputation) happens in Python in the container to prevent training-serving skew.
+- **Feature store** — Upstash Redis provides per-card rate limiting (10 txns/60s window) and prediction dedup caching (5-minute TTL) to reduce model invocation costs.
 - **Drift detection** — Evidently AI compares production features against a training reference dataset. Monitor Lambda runs every 6 hours, calls POST /drift, dispatches retrain if drift exceeds 30%.
 - **Label feedback** — POST /feedback attaches ground-truth labels to predictions in DynamoDB for retraining.
 - **Retrain loop** — GitHub Actions builds a training Docker image, runs ensemble training as a Fargate task, uploads new model artifacts to S3, then dispatches deploy.
@@ -89,12 +90,16 @@ fraud-detection/
 │
 ├── packages/
 │   ├── api/                         # Next.js 15 API
-│   │   └── src/app/api/
-│   │       ├── predict/route.ts     # POST — run inference
-│   │       ├── transactions/route.ts# GET — query predictions
-│   │       └── health/route.ts      # GET — health check
-│   ├── core/                        # Shared TypeScript types
-│   │   └── src/index.ts             # TransactionInput, PredictionResult, etc.
+│   │   └── src/
+│   │       ├── middleware.ts        # API key auth (x-api-key header)
+│   │       └── app/api/
+│   │           ├── predict/route.ts # POST — run inference
+│   │           ├── transactions/route.ts# GET — query predictions
+│   │           └── health/route.ts  # GET — health check
+│   ├── core/                        # Shared TypeScript types + Redis client
+│   │   └── src/
+│   │       ├── index.ts             # TransactionInput, PredictionResult, etc.
+│   │       └── redis.ts             # Upstash Redis client (rate limit + cache)
 │   └── monitor/                     # Drift monitoring Lambda
 │       └── src/index.ts             # Handler: calls /drift, dispatches retrain
 │
@@ -126,21 +131,25 @@ fraud-detection/
 
 ### Next.js API (public)
 
+All endpoints except `/api/health` require an `x-api-key` header.
+
 | Method | Path | Description |
 |---|---|---|
 | POST | `/api/predict` | Submit a transaction, get fraud prediction |
 | GET | `/api/transactions` | List recent predictions (limit 50) |
 | GET | `/api/transactions?id=<uuid>` | Get a specific prediction |
-| GET | `/api/health` | API + container health check |
+| GET | `/api/health` | API + container health check (no auth required) |
 
 ### Container (internal, via ALB)
+
+The container rejects requests without a valid `x-model-secret` header. Only the Next.js API knows this secret.
 
 | Method | Path | Description |
 |---|---|---|
 | POST | `/predict` | Run inference (called by Next.js API) |
 | POST | `/drift` | Compute Evidently drift report vs reference dataset |
 | POST | `/feedback` | Attach ground-truth label `{ prediction_id, label }` to a prediction |
-| GET | `/health` | Container health check |
+| GET | `/health` | Container health check (no auth required) |
 
 ### Predict Request
 
@@ -301,7 +310,9 @@ Trained models are copied to `container/model/` for packaging in the Docker imag
 
 ## What's Next
 
-- [ ] Feature store (Upstash Redis for online features, S3 + Parquet for offline)
+- [x] API key authentication (Next.js middleware + x-api-key header)
+- [x] Internal model service auth (shared secret between API and container)
+- [x] Rate limiting + prediction cache (Upstash Redis, per-card 60s window)
 - [ ] Event-driven ingestion (EventBridge + SQS for async transaction processing)
 - [ ] MLflow experiment tracking + model registry
 - [ ] Inference explainability (SHAP values in response)
