@@ -62,6 +62,7 @@ Client / Payment Processor
 | Monitoring | Evidently AI, CloudWatch, Monitor Lambda | Drift detection, alerting, retrain trigger |
 | CI/CD | GitHub Actions | Type-check, lint, train (Fargate), deploy (SST) |
 | Artifacts | S3 | Features, model artifacts, reference dataset |
+| Feature store | Upstash Redis | Rate limiting + prediction dedup cache |
 | Local dev | Docker Compose | DynamoDB Local + model container + API |
 
 ## Project Structure
