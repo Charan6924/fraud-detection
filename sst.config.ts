@@ -31,6 +31,9 @@ export default $config({
         rules: [{ listen: "80/http" }],
       },
       link: [predictionsTable],
+      environment: {
+        MODEL_SECRET: process.env.MODEL_SECRET!,
+      },
     });
 
     // Next.js API
@@ -40,7 +43,9 @@ export default $config({
     environment: {
       MODEL_SERVICE_URL: modelService.url,
       PREDICTIONS_TABLE: predictionsTable.name,
-      },
+      API_KEY: process.env.API_KEY!,
+      MODEL_SECRET: process.env.MODEL_SECRET!,
+    },
     });
 
     const monitorFunction = new sst.aws.Function("MonitorFunction", {
@@ -49,6 +54,7 @@ export default $config({
       environment : {
         MODEL_SERVICE_URL : modelService.url,
         GH_TOKEN : process.env.GH_TOKEN!,
+        MODEL_SECRET : process.env.MODEL_SECRET!,
       }
     });
 

@@ -13,7 +13,10 @@ export async function POST(req: NextRequest) {
 
   const modelRes = await fetch(`${process.env.MODEL_SERVICE_URL}/predict`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "x-model-secret": process.env.MODEL_SECRET!,
+    },
     body: JSON.stringify(input),
   });
 

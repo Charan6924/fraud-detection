@@ -13,7 +13,10 @@ export async function handler() {
         return { drift_checked: false, reason: "MODEL_SERVICE_URL not set" };
     }
 
-    const driftRes = await fetch(`${modelUrl}/drift`, { method: "POST" });
+    const driftRes = await fetch(`${modelUrl}/drift`, {
+        method: "POST",
+        headers: { "x-model-secret": process.env.MODEL_SECRET! },
+    });
     if (!driftRes.ok) {
         console.error("Drift endpoint failed:", driftRes.status, await driftRes.text());
         return { drift_checked: false, reason: `drift endpoint returned ${driftRes.status}` };

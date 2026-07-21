@@ -2,17 +2,29 @@
 
 from preprocess import preprocess
 from inference import inference, lr, rf, xgb, meta, imputer
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from drift import check_drift
 import boto3
 import os
 from schemas import TransactionInput, FeedbackInput
 from fastapi import HTTPException
+from fastapi.responses import JSONResponse
 from botocore.exceptions import ClientError
 import pandas as pd
 
 app = FastAPI()
 _dynamo_table = None
+
+
+@app.middleware("http")
+async def verify_secret(request: Request, call_next):
+    if request.url.path == "/health":
+        return await call_next(request)
+    secret = request.headers.get("x-model-secret")
+    expected = os.environ.get("MODEL_SECRET")
+    if not expected or secret != expected:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    return await call_next(request)
 
 def _get_table():
     global _dynamo_table
