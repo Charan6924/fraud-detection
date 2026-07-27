@@ -8,7 +8,7 @@
     "console": "sst console"
   },
   "devDependencies": {
-    "sst": "^4.15.2"
+    "sst": "^4.17.1"
   },
   "workspaces": [
     "packages/*"
