@@ -313,7 +313,6 @@ Trained models are copied to `container/model/` for packaging in the Docker imag
 - [x] API key authentication (Next.js middleware + x-api-key header)
 - [x] Internal model service auth (shared secret between API and container)
 - [x] Rate limiting + prediction cache (Upstash Redis, per-card 60s window)
-- [ ] Event-driven ingestion (EventBridge + SQS for async transaction processing)
 - [ ] MLflow experiment tracking + model registry
 - [ ] Inference explainability (SHAP values in response)
 - [ ] Monitoring hold in deploy pipeline (30-min CloudWatch watch + rollback)
