@@ -5,6 +5,7 @@ const config: Config = {
     {
       displayName: "core",
       rootDir: "packages/core",
+      roots: ["<rootDir>", "<rootDir>/../../tests/unit/core"],
       testMatch: ["<rootDir>/../../tests/unit/core/**/*.test.ts"],
       testEnvironment: "node",
       transform: { "^.+\\.ts$": ["ts-jest", { tsconfig: "packages/core/tsconfig.json" }] },
@@ -13,6 +14,7 @@ const config: Config = {
     {
       displayName: "monitor",
       rootDir: "packages/monitor",
+      roots: ["<rootDir>", "<rootDir>/../../tests/unit/monitor"],
       testMatch: ["<rootDir>/../../tests/unit/monitor/**/*.test.ts"],
       testEnvironment: "node",
       transform: { "^.+\\.ts$": ["ts-jest", { tsconfig: "packages/monitor/tsconfig.json" }] },
@@ -20,6 +22,7 @@ const config: Config = {
     {
       displayName: "api",
       rootDir: "packages/api",
+      roots: ["<rootDir>", "<rootDir>/../../tests/unit/api"],
       testMatch: ["<rootDir>/../../tests/unit/api/**/*.test.ts"],
       testEnvironment: "node",
       transform: { "^.+\\.ts$": ["ts-jest", { tsconfig: "packages/api/tsconfig.json" }] },
