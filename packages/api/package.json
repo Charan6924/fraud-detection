@@ -10,14 +10,14 @@
     "next": "^16.2.12",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "@aws-sdk/client-lambda": "^3.1095.0",
-    "@aws-sdk/client-dynamodb": "^3.1095.0",
-    "@aws-sdk/lib-dynamodb": "^3.1095.0",
+    "@aws-sdk/client-lambda": "^3.1100.0",
+    "@aws-sdk/client-dynamodb": "^3.1100.0",
+    "@aws-sdk/lib-dynamodb": "^3.1100.0",
     "core": "*"
   },
   "devDependencies": {
-    "@types/node": "^26.1.1",
-    "@types/react": "^19.0.0",
+    "@types/node": "^26.1.2",
+    "@types/react": "^19.2.18",
     "typescript": "^7.0.2"
   }
 }
