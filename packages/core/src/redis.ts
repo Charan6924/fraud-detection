@@ -30,7 +30,7 @@ export async function getCachedPrediction(cardId:string, amount:number): Promise
   return redis.get<PredictionResult>(key);
 }
 
-export async function setCacheEntry(cardId:string, amount:number, result:PredictionResult): Promise<Void> {
+export async function setCacheEntry(cardId:string, amount:number, result:PredictionResult): Promise<void> {
   const key = cacheKey(cardId,amount);
   await redis.set(key,result,{ex:CACHE_TTL});
 }
