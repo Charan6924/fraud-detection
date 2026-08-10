@@ -19,6 +19,6 @@
     "packages/*"
   ],
   "dependencies": {
-    "@upstash/redis": "^1.38.0"
+    "@upstash/redis": "^1.38.2"
   }
 }
