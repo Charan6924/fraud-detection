@@ -5,7 +5,8 @@
     "dev": "sst dev",
     "build": "sst build",
     "deploy": "sst deploy",
-    "console": "sst console"
+    "console": "sst console",
+    "test": "jest --ci"
   },
   "devDependencies": {
     "@jest/types": "^30.4.1",

@@ -20,18 +20,41 @@ jobs:
           node-version: 20
           cache: npm
 
-      - run: npm ci 
+      - run: npm ci
       - run: npx tsc --noEmit -p packages/api/tsconfig.json
+
+  test-js:
+    name: Jest Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
 
   lint:
     name: Python Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7 
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
         with:
           version: latest
       - run: uv tool install ruff
       - run: ruff check container/ ml/ main.py
+
+  test-py:
+    name: Pytest Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: latest
+      - run: uv sync
+      - run: uv run pytest
 
 
