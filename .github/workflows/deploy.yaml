@@ -31,5 +31,7 @@ jobs:
           mkdir -p container/model
           aws s3 sync s3://${{ env.ARTIFACTS_BUCKET }}/models/ container/model/ \
             --region ${{ env.REGION }} || echo "No models in S3, using bundled"
+          aws s3 cp s3://${{ env.ARTIFACTS_BUCKET }}/reference.parquet container/reference.parquet \
+            --region ${{ env.REGION }} || echo "No reference dataset in S3, using bundled"
 
       - run: npx sst deploy --stage production
