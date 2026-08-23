@@ -1,7 +1,7 @@
 """FastAPI inference server for fraud detection model ensemble."""
 
 from preprocess import preprocess
-from inference import inference, lr, rf, xgb, meta, imputer
+from inference import inference, load_models
 from fastapi import FastAPI, Request
 from drift import check_drift
 import boto3
@@ -48,7 +48,7 @@ def health():
 @app.post("/predict")
 def predict(transaction: TransactionInput):
     features = preprocess(transaction=transaction)
-    result = inference(features, lr, rf, xgb, meta, imputer)
+    result = inference(features, **load_models())
     return result
 
 

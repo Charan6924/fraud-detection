@@ -7,17 +7,21 @@ import numpy as np
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "model")
 THRESHOLD = 0.10
 
-lr_path = os.path.join(MODEL_DIR, "logistic_reg_model.joblib")
-rf_path = os.path.join(MODEL_DIR, "random_forest_model.joblib")
-xgb_path = os.path.join(MODEL_DIR, "xgboost_model.joblib")
-meta_path = os.path.join(MODEL_DIR, "meta_model.joblib")
-imputer_path = os.path.join(MODEL_DIR, "imputer.joblib")
+_MODELS = None
 
-lr = joblib.load(lr_path)
-rf = joblib.load(rf_path)
-xgb = joblib.load(xgb_path)
-meta = joblib.load(meta_path)
-imputer = joblib.load(imputer_path)
+
+def load_models():
+    """Load the ensemble artifacts once, lazily on first call."""
+    global _MODELS
+    if _MODELS is None:
+        _MODELS = {
+            "lr": joblib.load(os.path.join(MODEL_DIR, "logistic_reg_model.joblib")),
+            "rf": joblib.load(os.path.join(MODEL_DIR, "random_forest_model.joblib")),
+            "xgb": joblib.load(os.path.join(MODEL_DIR, "xgboost_model.joblib")),
+            "meta": joblib.load(os.path.join(MODEL_DIR, "meta_model.joblib")),
+            "imputer": joblib.load(os.path.join(MODEL_DIR, "imputer.joblib")),
+        }
+    return _MODELS
 
 
 def inference(inp, lr, rf, xgb, meta, imputer):
