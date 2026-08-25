@@ -8,7 +8,7 @@ and a practical acceptance condition for closing it.
 
 ### GAP-01: Local Compose prediction flow is incomplete
 
-Status: Open
+Status:  Done for Upstash local development; offline Redis mode remains optional.
 
 Evidence:
 
@@ -32,7 +32,7 @@ Evidence files: `docker-compose.yml`, `packages/api/src/middleware.ts`,
 
 ### GAP-02: Deployment secrets are not passed to SST
 
-Status: Open
+Status: 
 
 Evidence: `sst.config.ts` reads `API_KEY`, `MODEL_SECRET`, Upstash variables,
 and `GH_TOKEN` from `process.env`, but `.github/workflows/deploy.yaml` only
