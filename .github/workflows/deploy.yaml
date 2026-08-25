@@ -32,6 +32,15 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.REGION }}
 
+      - name: Validate deployment secrets
+        run: |
+          set -euo pipefail
+          test -n "$API_KEY" || { echo "::error::API_KEY is missing"; exit 1; }
+          test -n "$MODEL_SECRET" || { echo "::error::MODEL_SECRET is missing"; exit 1; }
+          test -n "$UPSTASH_REDIS_REST_URL" || { echo "::error::UPSTASH_REDIS_REST_URL is missing"; exit 1; }
+          test -n "$UPSTASH_REDIS_REST_TOKEN" || { echo "::error::UPSTASH_REDIS_REST_TOKEN is missing"; exit 1; }
+          test -n "$GH_TOKEN" || { echo "::error::GH_TOKEN is missing"; exit 1; }
+
       - name: Download latest model artifacts
         run: |
           set -euo pipefail

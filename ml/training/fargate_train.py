@@ -1,5 +1,6 @@
 """Ensemble training pipeline for Fargate: downloads features from S3, trains, uploads artifacts."""
 
+import json
 import os
 import joblib
 import pandas as pd
@@ -14,6 +15,13 @@ import xgboost
 
 s3 = boto3.client("s3")
 BUCKET = os.environ["ARTIFACTS_BUCKET"]
+MODEL_CONFIG_PATH = os.environ.get(
+    "MODEL_CONFIG_PATH",
+    os.path.join(os.path.dirname(__file__), "..", "..", "container", "model_config.json"),
+)
+with open(MODEL_CONFIG_PATH, encoding="utf-8") as config_file:
+    MODEL_CONFIG = json.load(config_file)
+THRESHOLD = float(MODEL_CONFIG["fraud_threshold"])
 MODEL_ARTIFACTS = (
     "meta_model.joblib",
     "xgboost_model.joblib",
@@ -85,7 +93,7 @@ def train():
           lr_model.predict_proba(X_test_imp)[:, 1],
       ])
     y_prob = meta.predict_proba(test_preds)[:, 1]
-    y_pred = meta.predict(test_preds)
+    y_pred = (y_prob >= THRESHOLD).astype(int)
 
     pr_auc = average_precision_score(y_test, y_prob)
     f1 = f1_score(y_test, y_pred)

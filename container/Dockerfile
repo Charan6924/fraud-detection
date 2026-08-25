@@ -6,6 +6,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app.py preprocess.py inference.py schemas.py features.py drift.py ./
+COPY model_config.json .
 COPY model/ ./model/
 COPY reference.parquet .
 

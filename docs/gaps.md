@@ -32,11 +32,11 @@ Evidence files: `docker-compose.yml`, `packages/api/src/middleware.ts`,
 
 ### GAP-02: Deployment secrets are not passed to SST
 
-Status: 
+Status: Closed
 
 Evidence: `sst.config.ts` reads `API_KEY`, `MODEL_SECRET`, Upstash variables,
-and `GH_TOKEN` from `process.env`, but `.github/workflows/deploy.yaml` only
-configures AWS credentials before running `sst deploy`.
+and `GH_TOKEN` from `process.env`. `.github/workflows/deploy.yaml` now maps
+these GitHub secrets into the deploy job and validates them before deployment.
 
 Impact: A deployment can complete with missing application authentication,
 Redis, or monitoring configuration.
@@ -75,11 +75,11 @@ Evidence files: `ml/features/build_features.py`, `container/app.py`,
 
 ### GAP-04: Retraining evaluates a different threshold than serving
 
-Status: Open
+Status: Closed
 
-Evidence: `ml/training/fargate_train.py` uses `meta.predict()`, which applies a
-default threshold of `0.5`. `container/inference.py` serves fraud when the
-probability is at least `0.10`.
+Evidence: `ml/training/fargate_train.py`, `ml/training/ensemble.py`, and
+`ml/training/train.py` now load `fraud_threshold` from the versioned
+`container/model_config.json`. `container/inference.py` loads the same config.
 
 Impact: Reported F1/FNR and any future promotion decision do not represent
 actual production behavior.

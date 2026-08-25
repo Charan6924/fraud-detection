@@ -1,8 +1,17 @@
 """Tests for the ensemble inference pipeline."""
 
+import json
+from pathlib import Path
+
 import numpy as np
 
 from inference import inference, THRESHOLD
+
+
+def test_threshold_matches_versioned_model_config():
+    config_path = Path(__file__).parents[3] / "container" / "model_config.json"
+    config = json.loads(config_path.read_text())
+    assert THRESHOLD == config["fraud_threshold"]
 
 
 class FixedProb:

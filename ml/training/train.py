@@ -1,3 +1,4 @@
+import json
 import joblib
 import os
 from sklearn.metrics import average_precision_score, confusion_matrix, f1_score
@@ -7,6 +8,9 @@ from imblearn.over_sampling import SMOTE
 from sklearn.model_selection import train_test_split
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+with open(os.path.join(PROJECT_ROOT, "container", "model_config.json"), encoding="utf-8") as config_file:
+    MODEL_CONFIG = json.load(config_file)
+THRESHOLD = float(MODEL_CONFIG["fraud_threshold"])
 
 
 def train_model():
@@ -36,7 +40,7 @@ def train_model():
 
     print("finished training")
     y_prob = model.predict_proba(X_test)[:, 1]
-    y_pred = model.predict(X_test)
+    y_pred = (y_prob >= THRESHOLD).astype(int)
 
     pr_auc = average_precision_score(y_test, y_prob)
     f1 = f1_score(y_test, y_pred)

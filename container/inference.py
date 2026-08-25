@@ -1,11 +1,15 @@
 """Model inference: loads saved ensemble and runs prediction."""
 
+import json
 import joblib
 import os
 import numpy as np
 
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "model")
-THRESHOLD = 0.10
+with open(os.path.join(os.path.dirname(__file__), "model_config.json"), encoding="utf-8") as config_file:
+    MODEL_CONFIG = json.load(config_file)
+THRESHOLD = float(MODEL_CONFIG["fraud_threshold"])
+MODEL_VERSION = str(MODEL_CONFIG["model_version"])
 
 _MODELS = None
 
@@ -35,7 +39,6 @@ def inference(inp, lr, rf, xgb, meta, imputer):
 
     meta_input = np.column_stack((xgb_probs, rf_probs, lr_probs))
 
-    # threshold = 0.10
     prob = meta.predict_proba(meta_input)[0, 1]
     prediction = int(prob >= THRESHOLD)
 
@@ -47,5 +50,5 @@ def inference(inp, lr, rf, xgb, meta, imputer):
             "random_forest": float(rf_probs),
             "logistic_regression": float(lr_probs),
         },
-        "model_version": "ensemble_v1",
+        "model_version": MODEL_VERSION,
     }

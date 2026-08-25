@@ -1,6 +1,7 @@
 """Train XGBoost + Random Forest + Logistic Regression ensemble with meta-model."""
 
 import xgboost
+import json
 import pandas as pd
 from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.linear_model import LogisticRegression
@@ -12,6 +13,9 @@ from sklearn.metrics import f1_score, average_precision_score, confusion_matrix
 from sklearn.impute import SimpleImputer
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+with open(os.path.join(PROJECT_ROOT, "container", "model_config.json"), encoding="utf-8") as config_file:
+    MODEL_CONFIG = json.load(config_file)
+THRESHOLD = float(MODEL_CONFIG["fraud_threshold"])
 
 
 def ensemble_modelling():
@@ -95,7 +99,7 @@ def ensemble_modelling():
         ]
     )
     y_prob = meta.predict_proba(test_preds)[:, 1]
-    y_pred = meta.predict(test_preds)
+    y_pred = (y_prob >= THRESHOLD).astype(int)
 
     pr_auc = average_precision_score(y_test, y_prob)
     f1 = f1_score(y_test, y_pred)

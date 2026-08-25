@@ -12,5 +12,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ml/training/ ./training/
 COPY ml/features/ ./features/
+COPY container/model_config.json ./model_config.json
+
+ENV MODEL_CONFIG_PATH=/app/model_config.json
 
 ENTRYPOINT ["python", "training/fargate_train.py"]

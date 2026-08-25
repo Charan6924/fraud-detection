@@ -1,0 +1,4 @@
+{
+  "model_version": "ensemble_v1",
+  "fraud_threshold": 0.1
+}
