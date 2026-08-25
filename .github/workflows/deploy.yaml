@@ -13,6 +13,12 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+        API_KEY: ${{ secrets.API_KEY }}
+        MODEL_SECRET: ${{ secrets.MODEL_SECRET }}
+        UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+        UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -45,5 +51,15 @@ jobs:
             test -s "container/model/$artifact"
           done
           test -s container/reference.parquet
+
+      - name: Validate deployment secrets
+        run: |
+          set -euo pipefail
+
+          test -n "$API_KEY" || { echo "::error::API_KEY is missing"; exit 1; }
+          test -n "$MODEL_SECRET" || { echo "::error::MODEL_SECRET is missing"; exit 1; }
+          test -n "$UPSTASH_REDIS_REST_URL" || { echo "::error::Upstash URL is missing"; exit 1; }
+          test -n "$UPSTASH_REDIS_REST_TOKEN" || { echo "::error::Upstash token is missing"; exit 1; }
+          test -n "$GH_TOKEN" || { echo "::error::GH_TOKEN is missing"; exit 1; }
 
       - run: npx sst deploy --stage production
