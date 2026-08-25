@@ -34,6 +34,8 @@ services:
       context: ./container
     ports:
       - "8001:80"
+    environment:
+      - MODEL_SECRET=${MODEL_SECRET}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:80/health')"]
       interval: 10s
@@ -50,10 +52,13 @@ services:
       - MODEL_SERVICE_URL=http://model:80
       - PREDICTIONS_TABLE=Predictions
       - DYNAMODB_ENDPOINT=http://dynamodb:8000
+      - API_KEY=${API_KEY}
+      - MODEL_SECRET=${MODEL_SECRET}
+      - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
+      - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
     depends_on:
       dynamodb-init:
         condition: service_completed_successfully
       model:
         condition: service_healthy
   
-
