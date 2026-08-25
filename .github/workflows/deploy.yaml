@@ -28,10 +28,22 @@ jobs:
 
       - name: Download latest model artifacts
         run: |
+          set -euo pipefail
           mkdir -p container/model
-          aws s3 sync s3://${{ env.ARTIFACTS_BUCKET }}/models/ container/model/ \
-            --region ${{ env.REGION }} || echo "No models in S3, using bundled"
-          aws s3 cp s3://${{ env.ARTIFACTS_BUCKET }}/reference.parquet container/reference.parquet \
-            --region ${{ env.REGION }} || echo "No reference dataset in S3, using bundled"
+          aws s3 sync "s3://${{ env.ARTIFACTS_BUCKET }}/models/" container/model/ \
+            --region "${{ env.REGION }}"
+          aws s3 cp "s3://${{ env.ARTIFACTS_BUCKET }}/reference.parquet" container/reference.parquet \
+            --region "${{ env.REGION }}"
+
+          for artifact in \
+            meta_model.joblib \
+            xgboost_model.joblib \
+            random_forest_model.joblib \
+            logistic_reg_model.joblib \
+            imputer.joblib \
+            scaler.joblib; do
+            test -s "container/model/$artifact"
+          done
+          test -s container/reference.parquet
 
       - run: npx sst deploy --stage production

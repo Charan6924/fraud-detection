@@ -14,10 +14,22 @@ import xgboost
 
 s3 = boto3.client("s3")
 BUCKET = os.environ["ARTIFACTS_BUCKET"]
+MODEL_ARTIFACTS = (
+    "meta_model.joblib",
+    "xgboost_model.joblib",
+    "random_forest_model.joblib",
+    "logistic_reg_model.joblib",
+    "imputer.joblib",
+    "scaler.joblib",
+)
 
 
 def train():
     s3.download_file(BUCKET, "features.parquet", "/tmp/features.parquet")
+    os.makedirs("/tmp/models", exist_ok=True)
+    # Features are already scaled by the feature-building job. Preserve the
+    # matching scaler so raw inference inputs use the same transformation.
+    s3.download_file(BUCKET, "models/scaler.joblib", "/tmp/models/scaler.joblib")
     df = pd.read_parquet("/tmp/features.parquet")
     X = df.drop(columns="isFraud")
     y = df["isFraud"]
@@ -83,7 +95,6 @@ def train():
     print(f"PR-AUC: {pr_auc:.4f}  F1: {f1:.4f}  FNR: {fnr:.4%}")
 
     # Save artifacts
-    os.makedirs("/tmp/models", exist_ok=True)
     joblib.dump(meta, "/tmp/models/meta_model.joblib")
     joblib.dump(xgb_model, "/tmp/models/xgboost_model.joblib")
     joblib.dump(rf_model, "/tmp/models/random_forest_model.joblib")
@@ -91,7 +102,11 @@ def train():
     joblib.dump(imputer, "/tmp/models/imputer.joblib")
 
     # Upload to S3
-    for f in os.listdir("/tmp/models"):
+    missing = [name for name in MODEL_ARTIFACTS if not os.path.isfile(f"/tmp/models/{name}")]
+    if missing:
+        raise RuntimeError(f"Missing model artifacts: {', '.join(missing)}")
+
+    for f in MODEL_ARTIFACTS:
         s3.upload_file(f"/tmp/models/{f}", BUCKET, f"models/{f}")
 
     # Generate & upload reference dataset

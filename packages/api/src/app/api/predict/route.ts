@@ -12,7 +12,7 @@ const ddb = DynamoDBDocumentClient.from(ddbClient);
 export async function POST(req: NextRequest) {
   const input: TransactionInput = await req.json();
   const cardId = String(input.card1);
-  const allowed = checkRateLimit(cardId)
+  const allowed = await checkRateLimit(cardId)
   if (!allowed){
     return NextResponse.json({error: "Rate limit exceeded"},{status:429})
   }

@@ -33,6 +33,7 @@ export default $config({
       link: [predictionsTable],
       environment: {
         MODEL_SECRET: process.env.MODEL_SECRET!,
+        PREDICTIONS_TABLE: predictionsTable.name,
       },
     });
 
@@ -72,4 +73,3 @@ export default $config({
     };
   }
 });
-    

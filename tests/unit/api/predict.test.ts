@@ -106,7 +106,10 @@ describe("predict endpoint", () => {
     const res = await POST(req);
 
     expect(mockCheckRateLimit).toHaveBeenCalledWith("10001");
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(429);
+    expect(res.data).toEqual({ error: "Rate limit exceeded" });
+    expect(mockGetCachedPrediction).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
 
     mockFetch.mockRestore();
   });
