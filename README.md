@@ -302,6 +302,20 @@ python threshold_tuning.py
 
 Trained models are copied to `container/model/` for packaging in the Docker image.
 
+### Bootstrap S3 Artifacts
+
+Model binaries and the drift reference are intentionally kept out of Git. Before
+the first deployment, publish the local artifacts and feature dataset to the
+configured S3 bucket:
+
+```bash
+ARTIFACTS_BUCKET=your-bucket ./scripts/publish_artifacts.sh
+```
+
+The script validates all six model files, generates
+`container/reference.parquet` with named feature columns, and uploads the
+deployment inputs consumed by the training and deploy workflows.
+
 ## CI/CD
 
 - **CI** — Runs on every push/PR to `main`. TypeScript type-check (`tsc --noEmit`) across the API package, and Python lint (`ruff check`) on container and ML code.
