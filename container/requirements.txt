@@ -7,4 +7,4 @@ numpy==2.5.2
 joblib==1.5.3
 pydantic==2.13.4
 evidently==0.7.21
-boto3>=1.43.77
+boto3>=1.43.82
