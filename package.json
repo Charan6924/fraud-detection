@@ -9,9 +9,9 @@
     "test": "jest --ci"
   },
   "devDependencies": {
-    "@jest/types": "^30.4.1",
+    "@jest/types": "^30.5.1",
     "@types/jest": "^30.0.0",
-    "jest": "^30.4.2",
+    "jest": "^30.5.1",
     "sst": "^4.17.1",
     "ts-jest": "^29.4.12",
     "ts-node": "^10.9.2"
