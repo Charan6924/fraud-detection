@@ -5,7 +5,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@upstash/redis" : "^1.38.3"
+    "@upstash/redis" : "^1.38.4"
   },
   "devDependencies": {
     "typescript": "^7.0.2"
