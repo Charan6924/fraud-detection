@@ -1,4 +1,4 @@
-fastapi==0.141.1
+fastapi==0.142.2
 uvicorn==0.54.0
 xgboost==3.4.1
 scikit-learn==1.9.1
@@ -7,4 +7,4 @@ numpy==2.5.3
 joblib==1.6.0
 pydantic==2.13.5
 evidently==0.7.23
-boto3>=1.43.102
+boto3>=1.43.107
