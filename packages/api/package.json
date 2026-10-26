@@ -10,9 +10,9 @@
     "next": "^16.4.2",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "@aws-sdk/client-lambda": "^3.1152.0",
-    "@aws-sdk/client-dynamodb": "^3.1152.0",
-    "@aws-sdk/lib-dynamodb": "^3.1152.0",
+    "@aws-sdk/client-lambda": "^3.1156.0",
+    "@aws-sdk/client-dynamodb": "^3.1156.0",
+    "@aws-sdk/lib-dynamodb": "^3.1156.0",
     "core": "*"
   },
   "devDependencies": {
