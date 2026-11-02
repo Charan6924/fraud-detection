@@ -7,16 +7,16 @@
     "start": "next start"
   },
   "dependencies": {
-    "next": "^16.4.2",
+    "next": "^16.4.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "@aws-sdk/client-lambda": "^3.1156.0",
-    "@aws-sdk/client-dynamodb": "^3.1156.0",
-    "@aws-sdk/lib-dynamodb": "^3.1156.0",
+    "@aws-sdk/client-lambda": "^3.1160.0",
+    "@aws-sdk/client-dynamodb": "^3.1160.0",
+    "@aws-sdk/lib-dynamodb": "^3.1160.0",
     "core": "*"
   },
   "devDependencies": {
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "typescript": "^7.0.2"
   }
